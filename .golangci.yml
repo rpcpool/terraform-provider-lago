@@ -18,30 +18,30 @@ linters:
     - unparam
     - unused
     - usetesting
+  settings:
+    depguard:
+      rules:
+        main:
+          list-mode: lax
+          deny:
+            - pkg: "github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
+              desc: Use github.com/hashicorp/terraform-plugin-testing/helper/acctest instead
+            - pkg: "github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+              desc: Use github.com/hashicorp/terraform-plugin-testing/helper/resource instead
+            - pkg: "github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+              desc: Use github.com/hashicorp/terraform-plugin-testing/terraform instead
+            - pkg: "github.com/hashicorp/terraform-plugin-sdk/v2"
+              desc: Use github.com/hashicorp/terraform-plugin-framework instead
+  exclusions:
+    generated: strict
+    rules:
+      - path: '(.+)_test\.go'
+        linters:
+          - unparam
 
 issues:
-  exclude-generated: strict
-  exclude-rules:
-    - path: '(.+)_test\.go'
-      linters:
-        - unparam
   max-issues-per-linter: 0
   max-same-issues: 0
-
-linters-settings:
-  depguard:
-    rules:
-      main:
-        list-mode: lax
-        deny:
-          - pkg: "github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-            desc: Use github.com/hashicorp/terraform-plugin-testing/helper/acctest instead
-          - pkg: "github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-            desc: Use github.com/hashicorp/terraform-plugin-testing/helper/resource instead
-          - pkg: "github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
-            desc: Use github.com/hashicorp/terraform-plugin-testing/terraform instead
-          - pkg: "github.com/hashicorp/terraform-plugin-sdk/v2"
-            desc: Use github.com/hashicorp/terraform-plugin-framework instead
 
 formatters:
   enable:
