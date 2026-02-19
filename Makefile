@@ -1,26 +1,29 @@
 SHELL := /usr/bin/env bash
 
-BINARY := terraform-provider-lago
-
-.PHONY: build test testacc fmt vet install clean
+default: fmt lint install generate
 
 build:
-	go build -o bin/$(BINARY) .
+	go build -v ./...
 
-test:
-	go test ./...
+install: build
+	go install -v ./...
 
-testacc:
-	LAGO_ACC=1 go test ./internal/provider -v -count=1
+lint:
+	golangci-lint run
+
+generate:
+	cd tools; go generate ./...
 
 fmt:
-	gofmt -w $$(find . -name '*.go')
+	gofmt -s -w -e .
 
-vet:
-	go vet ./...
+test:
+	go test -v -cover -timeout=120s -parallel=10 ./...
 
-install:
-	go install .
+testacc:
+	TF_ACC=1 go test -v -cover -timeout 120m ./...
 
 clean:
 	rm -rf bin
+
+.PHONY: fmt lint test testacc build install generate clean
