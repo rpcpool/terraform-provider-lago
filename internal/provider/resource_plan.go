@@ -78,6 +78,7 @@ type planChargeModel struct {
 	Prorated           types.Bool   `tfsdk:"prorated"`
 	MinAmountCents     types.Int64  `tfsdk:"min_amount_cents"`
 	PropertiesJSON     types.String `tfsdk:"properties_json"`
+	FiltersJSON        types.String `tfsdk:"filters_json"`
 	TaxCodes           types.Set    `tfsdk:"tax_codes"`
 }
 
@@ -159,6 +160,7 @@ func (r *planResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					"prorated":             schema.BoolAttribute{Optional: true},
 					"min_amount_cents":     schema.Int64Attribute{Optional: true},
 					"properties_json":      schema.StringAttribute{Optional: true},
+					"filters_json":         schema.StringAttribute{Optional: true, MarkdownDescription: "JSON array of charge filters."},
 					"tax_codes":            schema.SetAttribute{Optional: true, ElementType: types.StringType},
 				}},
 			},
@@ -448,7 +450,13 @@ func mapPlanToModel(plan *client.Plan, base planResourceModel) (planResourceMode
 
 	charges, cdiags := flattenCharges(plan.Charges)
 	diags.Append(cdiags...)
-	state.Charges = charges
+	if !base.Charges.IsNull() && !base.Charges.IsUnknown() {
+		// Lago may reorder/normalize charge payloads in create/update responses.
+		// Preserve configured charge blocks in state to avoid inconsistent apply results.
+		state.Charges = base.Charges
+	} else {
+		state.Charges = charges
+	}
 
 	minimumCommitment, mcdiags := flattenMinimumCommitment(plan.MinimumCommitment)
 	diags.Append(mcdiags...)
@@ -555,6 +563,17 @@ func jsonFieldValue(value json.RawMessage) types.String {
 	return types.StringValue(string(value))
 }
 
+func chargeFiltersJSONValue(filters []client.PlanChargeFilter) types.String {
+	if len(filters) == 0 {
+		return types.StringNull()
+	}
+	raw, err := json.Marshal(filters)
+	if err != nil {
+		return types.StringNull()
+	}
+	return types.StringValue(string(raw))
+}
+
 func chargeObjectType() types.ObjectType {
 	return types.ObjectType{AttrTypes: map[string]attr.Type{
 		"billable_metric_id":   types.StringType,
@@ -566,6 +585,7 @@ func chargeObjectType() types.ObjectType {
 		"prorated":             types.BoolType,
 		"min_amount_cents":     types.Int64Type,
 		"properties_json":      types.StringType,
+		"filters_json":         types.StringType,
 		"tax_codes":            types.SetType{ElemType: types.StringType},
 	}}
 }
@@ -624,6 +644,14 @@ func expandCharges(ctx context.Context, value types.List) ([]client.PlanCharge, 
 			}
 			charge.Properties = raw
 		}
+		if !m.FiltersJSON.IsNull() {
+			var filters []client.PlanChargeFilter
+			if err := json.Unmarshal([]byte(m.FiltersJSON.ValueString()), &filters); err != nil {
+				diags.AddError("Invalid charge filters_json", err.Error())
+				return nil, diags
+			}
+			charge.Filters = filters
+		}
 		taxCodes, tdiags := expandStringSet(ctx, m.TaxCodes)
 		diags.Append(tdiags...)
 		if diags.HasError() {
@@ -667,6 +695,7 @@ func flattenCharges(charges []client.PlanCharge) (types.List, diag.Diagnostics) 
 			"prorated":             boolPtrOrNull(charge.Prorated),
 			"min_amount_cents":     int64PtrOrNull(charge.MinAmountCents),
 			"properties_json":      jsonFieldValue(charge.Properties),
+			"filters_json":         chargeFiltersJSONValue(charge.Filters),
 			"tax_codes":            taxCodes,
 		}
 		values = append(values, types.ObjectValueMust(chargeObjectType().AttrTypes, attrs))

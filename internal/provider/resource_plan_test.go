@@ -31,6 +31,7 @@ func TestPlanExpandFlattenCharges(t *testing.T) {
 			"prorated":             types.BoolValue(false),
 			"min_amount_cents":     types.Int64Value(0),
 			"properties_json":      types.StringValue(`{"amount":"1"}`),
+			"filters_json":         types.StringNull(),
 			"tax_codes":            types.SetValueMust(types.StringType, []attr.Value{types.StringValue("tx_1")}),
 		}),
 	})

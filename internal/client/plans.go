@@ -34,18 +34,27 @@ type Plan struct {
 }
 
 type PlanCharge struct {
-	LagoBillableMetricID string          `json:"lago_billable_metric_id,omitempty"`
-	BillableMetricID     string          `json:"billable_metric_id,omitempty"`
-	ChargeModel          string          `json:"charge_model,omitempty"`
-	Invoiceable          *bool           `json:"invoiceable,omitempty"`
-	InvoiceDisplayName   *string         `json:"invoice_display_name,omitempty"`
-	PayInAdvance         *bool           `json:"pay_in_advance,omitempty"`
-	RegroupPaidFees      *bool           `json:"regroup_paid_fees,omitempty"`
-	Prorated             *bool           `json:"prorated,omitempty"`
-	MinAmountCents       *int64          `json:"min_amount_cents,omitempty"`
-	Properties           json.RawMessage `json:"properties,omitempty"`
-	TaxCodes             []string        `json:"tax_codes,omitempty"`
-	Taxes                []Tax           `json:"taxes,omitempty"`
+	LagoBillableMetricID string             `json:"lago_billable_metric_id,omitempty"`
+	BillableMetricID     string             `json:"billable_metric_id,omitempty"`
+	ChargeModel          string             `json:"charge_model,omitempty"`
+	Invoiceable          *bool              `json:"invoiceable,omitempty"`
+	InvoiceDisplayName   *string            `json:"invoice_display_name,omitempty"`
+	PayInAdvance         *bool              `json:"pay_in_advance,omitempty"`
+	RegroupPaidFees      *bool              `json:"regroup_paid_fees,omitempty"`
+	Prorated             *bool              `json:"prorated,omitempty"`
+	MinAmountCents       *int64             `json:"min_amount_cents,omitempty"`
+	Properties           json.RawMessage    `json:"properties,omitempty"`
+	Filters              []PlanChargeFilter `json:"filters,omitempty"`
+	TaxCodes             []string           `json:"tax_codes,omitempty"`
+	Taxes                []Tax              `json:"taxes,omitempty"`
+}
+
+type PlanChargeFilter struct {
+	LagoID             string              `json:"lago_id,omitempty"`
+	ChargeCode         string              `json:"charge_code,omitempty"`
+	InvoiceDisplayName *string             `json:"invoice_display_name,omitempty"`
+	Properties         json.RawMessage     `json:"properties,omitempty"`
+	Values             map[string][]string `json:"values,omitempty"`
 }
 
 type PlanMinimumCommitment struct {

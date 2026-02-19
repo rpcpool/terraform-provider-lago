@@ -44,6 +44,7 @@ type billableMetricResource struct {
 
 type billableMetricResourceModel struct {
 	ID               types.String `tfsdk:"id"`
+	LagoID           types.String `tfsdk:"lago_id"`
 	Name             types.String `tfsdk:"name"`
 	Code             types.String `tfsdk:"code"`
 	Description      types.String `tfsdk:"description"`
@@ -68,6 +69,10 @@ func (r *billableMetricResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Terraform resource ID, set to the metric code.",
+			},
+			"lago_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Lago internal identifier.",
 			},
 			"name": schema.StringAttribute{
 				Required:            true,
@@ -333,6 +338,11 @@ func mapBillableMetricToModel(metric *client.BillableMetric, base billableMetric
 	state := base
 
 	state.ID = types.StringValue(metric.Code)
+	if metric.LagoID == "" {
+		state.LagoID = types.StringNull()
+	} else {
+		state.LagoID = types.StringValue(metric.LagoID)
+	}
 	state.Name = types.StringValue(metric.Name)
 	state.Code = types.StringValue(metric.Code)
 	state.AggregationType = types.StringValue(metric.AggregationType)

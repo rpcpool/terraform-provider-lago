@@ -8,6 +8,7 @@ import (
 )
 
 type BillableMetric struct {
+	LagoID           string                 `json:"lago_id,omitempty"`
 	Name             string                 `json:"name"`
 	Code             string                 `json:"code"`
 	Description      string                 `json:"description,omitempty"`
