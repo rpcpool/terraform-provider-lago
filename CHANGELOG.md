@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/rpcpool/terraform-provider-lago/compare/v1.4.0...v1.4.1) (2026-02-20)
+
+
+### Bug Fixes
+
+* update module path and registry to rpcpool ([a2330be](https://github.com/rpcpool/terraform-provider-lago/commit/a2330be5599b195da5621b4a8b114d28cfb5d486))
+
 ## [1.4.0](https://github.com/rpcpool/terraform-provider-lago/compare/v1.3.0...v1.4.0) (2026-02-20)
 
 
