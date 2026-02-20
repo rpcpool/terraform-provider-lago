@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/rpcpool/terraform-provider-lago/compare/v1.3.0...v1.4.0) (2026-02-20)
+
+
+### Features
+
+* trigger release-please ([cd40468](https://github.com/rpcpool/terraform-provider-lago/commit/cd40468d9c2172c8ed34dcfccc606381a42d0e0c))
+
 ## [1.3.0](https://github.com/rpcpool/terraform-provider-lago/compare/v1.2.0...v1.3.0) (2026-02-20)
 
 
