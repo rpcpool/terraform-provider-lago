@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/triton-one/terraform-provider-lago/internal/client"
+	"github.com/rpcpool/terraform-provider-lago/internal/client"
 )
 
 func TestValidateWeightedInterval(t *testing.T) {

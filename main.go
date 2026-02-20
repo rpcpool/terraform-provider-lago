@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/triton-one/terraform-provider-lago/internal/provider"
+	"github.com/rpcpool/terraform-provider-lago/internal/provider"
 )
 
 var version = "dev"
@@ -18,7 +18,7 @@ func main() {
 	flag.Parse()
 
 	err := providerserver.Serve(context.Background(), provider.New(version), providerserver.ServeOpts{
-		Address: "registry.opentofu.org/triton-one/lago",
+		Address: "registry.opentofu.org/rpcpool/lago",
 		Debug:   debug,
 	})
 	if err != nil {

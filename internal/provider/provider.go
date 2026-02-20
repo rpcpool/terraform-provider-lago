@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/triton-one/terraform-provider-lago/internal/client"
+	"github.com/rpcpool/terraform-provider-lago/internal/client"
 )
 
 var _ provider.Provider = &lagoProvider{}

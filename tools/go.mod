@@ -1,4 +1,4 @@
-module github.com/triton-one/terraform-provider-lago/tools
+module github.com/rpcpool/terraform-provider-lago/tools
 
 go 1.25.0
 

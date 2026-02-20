@@ -16,7 +16,7 @@ Manages a Lago billable metric.
 terraform {
   required_providers {
     lago = {
-      source  = "triton-one/lago"
+      source  = "registry.opentofu.org/rpcpool/lago"
       version = ">= 0.1.0"
     }
   }

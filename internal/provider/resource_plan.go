@@ -19,7 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	"github.com/triton-one/terraform-provider-lago/internal/client"
+	"github.com/rpcpool/terraform-provider-lago/internal/client"
 )
 
 var (

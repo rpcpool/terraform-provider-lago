@@ -1,6 +1,6 @@
 # Agent Instructions: terraform-provider-lago
 
-This is a Terraform provider for [Lago](https://www.getlago.com/), an open-source usage-based billing platform. It is written in Go using the [Terraform Plugin Framework](https://github.com/hashicorp/terraform-plugin-framework) and targets the OpenTofu registry at `registry.opentofu.org/triton-one/lago`.
+This is a Terraform provider for [Lago](https://www.getlago.com/), an open-source usage-based billing platform. It is written in Go using the [Terraform Plugin Framework](https://github.com/hashicorp/terraform-plugin-framework) and targets the OpenTofu registry at `registry.opentofu.org/rpcpool/lago`.
 
 ## Commit Messages
 
