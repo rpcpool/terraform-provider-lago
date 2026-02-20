@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/rpcpool/terraform-provider-lago/compare/v1.1.0...v1.2.0) (2026-02-20)
+
+
+### Features
+
+* Merge branch 'main' of github.com:rpcpool/terraform-provider-lago ([875885f](https://github.com/rpcpool/terraform-provider-lago/commit/875885fb5dc58e799db91df53e93d76f4faf6b69))
+* regenerate provider and resource documentation with tfplugindocs ([d31acd8](https://github.com/rpcpool/terraform-provider-lago/commit/d31acd8065ddf5562c1308f639c79ca9fd8fa9c2))
+
 ## [1.1.0](https://github.com/rpcpool/terraform-provider-lago/compare/v1.0.0...v1.1.0) (2026-02-20)
 
 
