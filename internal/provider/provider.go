@@ -2,17 +2,19 @@ package provider
 
 import (
 	"context"
-	"fmt"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
+	lago "github.com/getlago/lago-go-client"
+	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/rpcpool/terraform-provider-lago/internal/client"
 )
 
 var _ provider.Provider = &lagoProvider{}
@@ -34,7 +36,7 @@ type lagoProviderModel struct {
 }
 
 type lagoProviderData struct {
-	client *client.Client
+	client *lago.Client
 }
 
 func (p *lagoProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -99,11 +101,21 @@ func (p *lagoProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 		return
 	}
 
-	lagoClient, err := client.NewClient(apiEndpoint, apiKey)
-	if err != nil {
-		resp.Diagnostics.AddError("Invalid Lago Provider Configuration", fmt.Sprintf("Unable to configure Lago client: %s", err.Error()))
-		return
-	}
+	lagoClient := lago.New().
+		SetApiKey(apiKey).
+		SetBaseURL(apiEndpoint)
+
+	lagoClient.HttpClient.
+		SetRetryCount(3).
+		SetRetryWaitTime(200 * time.Millisecond).
+		SetRetryMaxWaitTime(600 * time.Millisecond).
+		AddRetryCondition(func(r *resty.Response, err error) bool {
+			if err != nil {
+				return true
+			}
+			sc := r.StatusCode()
+			return sc == http.StatusTooManyRequests || sc >= 500
+		})
 
 	providerData := &lagoProviderData{client: lagoClient}
 	resp.DataSourceData = providerData

@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	lago "github.com/getlago/lago-go-client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -16,7 +18,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/rpcpool/terraform-provider-lago/internal/client"
 )
 
 var (
@@ -39,7 +40,7 @@ func NewBillableMetricResource() resource.Resource {
 }
 
 type billableMetricResource struct {
-	client *client.Client
+	client *lago.Client
 }
 
 type billableMetricResourceModel struct {
@@ -173,31 +174,19 @@ func (r *billableMetricResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	input := client.CreateBillableMetricInput{
+	input := lago.BillableMetricInput{
 		Name:            plan.Name.ValueString(),
 		Code:            plan.Code.ValueString(),
-		AggregationType: plan.AggregationType.ValueString(),
-	}
-	if !plan.Description.IsNull() {
-		description := plan.Description.ValueString()
-		input.Description = &description
-	}
-	if !plan.FieldName.IsNull() {
-		fieldName := plan.FieldName.ValueString()
-		input.FieldName = &fieldName
-	}
-	if !plan.Expression.IsNull() {
-		expression := plan.Expression.ValueString()
-		input.Expression = &expression
-	}
-	if !plan.Recurring.IsNull() {
-		recurring := plan.Recurring.ValueBool()
-		input.Recurring = &recurring
+		Description:     plan.Description.ValueString(),
+		AggregationType: lago.AggregationType(plan.AggregationType.ValueString()),
+		FieldName:       plan.FieldName.ValueString(),
+		Expression:      plan.Expression.ValueString(),
+		Recurring:       plan.Recurring.ValueBool(),
 	}
 	if !plan.WeightedInterval.IsNull() {
-		weightedInterval := plan.WeightedInterval.ValueString()
-		input.WeightedInterval = &weightedInterval
+		input.WeightedInterval = lago.WeightedInterval(plan.WeightedInterval.ValueString())
 	}
+
 	filters, diags := expandFilters(ctx, plan.Filters)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -205,9 +194,9 @@ func (r *billableMetricResource) Create(ctx context.Context, req resource.Create
 	}
 	input.Filters = filters
 
-	created, err := r.client.CreateBillableMetric(ctx, input)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Creating Lago Billable Metric", err.Error())
+	created, lagoErr := r.client.BillableMetric().Create(ctx, &input)
+	if lagoErr != nil {
+		resp.Diagnostics.AddError("Error Creating Lago Billable Metric", lagoErr.Error())
 		return
 	}
 
@@ -223,14 +212,13 @@ func (r *billableMetricResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	metric, err := r.client.GetBillableMetricByCode(ctx, state.Code.ValueString())
-	if err != nil {
-		if client.IsNotFound(err) {
+	metric, lagoErr := r.client.BillableMetric().Get(ctx, state.Code.ValueString())
+	if lagoErr != nil {
+		if isNotFound(lagoErr) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
-
-		resp.Diagnostics.AddError("Error Reading Lago Billable Metric", err.Error())
+		resp.Diagnostics.AddError("Error Reading Lago Billable Metric", lagoErr.Error())
 		return
 	}
 
@@ -251,34 +239,19 @@ func (r *billableMetricResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	input := client.UpdateBillableMetricInput{}
-
-	name := plan.Name.ValueString()
-	input.Name = &name
-
-	aggregationType := plan.AggregationType.ValueString()
-	input.AggregationType = &aggregationType
-
-	if !plan.Description.IsNull() {
-		description := plan.Description.ValueString()
-		input.Description = &description
-	}
-	if !plan.FieldName.IsNull() {
-		fieldName := plan.FieldName.ValueString()
-		input.FieldName = &fieldName
-	}
-	if !plan.Expression.IsNull() {
-		expression := plan.Expression.ValueString()
-		input.Expression = &expression
-	}
-	if !plan.Recurring.IsNull() {
-		recurring := plan.Recurring.ValueBool()
-		input.Recurring = &recurring
+	input := lago.BillableMetricInput{
+		Name:            plan.Name.ValueString(),
+		Code:            plan.Code.ValueString(),
+		AggregationType: lago.AggregationType(plan.AggregationType.ValueString()),
+		Description:     plan.Description.ValueString(),
+		FieldName:       plan.FieldName.ValueString(),
+		Expression:      plan.Expression.ValueString(),
+		Recurring:       plan.Recurring.ValueBool(),
 	}
 	if !plan.WeightedInterval.IsNull() {
-		weightedInterval := plan.WeightedInterval.ValueString()
-		input.WeightedInterval = &weightedInterval
+		input.WeightedInterval = lago.WeightedInterval(plan.WeightedInterval.ValueString())
 	}
+
 	filters, diags := expandFilters(ctx, plan.Filters)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -286,9 +259,9 @@ func (r *billableMetricResource) Update(ctx context.Context, req resource.Update
 	}
 	input.Filters = filters
 
-	metric, err := r.client.UpdateBillableMetricByCode(ctx, plan.Code.ValueString(), input)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Updating Lago Billable Metric", err.Error())
+	metric, lagoErr := r.client.BillableMetric().Update(ctx, &input)
+	if lagoErr != nil {
+		resp.Diagnostics.AddError("Error Updating Lago Billable Metric", lagoErr.Error())
 		return
 	}
 
@@ -304,9 +277,9 @@ func (r *billableMetricResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	err := r.client.DeleteBillableMetricByCode(ctx, state.Code.ValueString())
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Error Deleting Lago Billable Metric", err.Error())
+	_, lagoErr := r.client.BillableMetric().Delete(ctx, state.Code.ValueString())
+	if lagoErr != nil && !isNotFound(lagoErr) {
+		resp.Diagnostics.AddError("Error Deleting Lago Billable Metric", lagoErr.Error())
 	}
 }
 
@@ -334,18 +307,14 @@ func validateWeightedInterval(aggregationType types.String, weightedInterval typ
 	return diags
 }
 
-func mapBillableMetricToModel(metric *client.BillableMetric, base billableMetricResourceModel) billableMetricResourceModel {
+func mapBillableMetricToModel(metric *lago.BillableMetric, base billableMetricResourceModel) billableMetricResourceModel {
 	state := base
 
 	state.ID = types.StringValue(metric.Code)
-	if metric.LagoID == "" {
-		state.LagoID = types.StringNull()
-	} else {
-		state.LagoID = types.StringValue(metric.LagoID)
-	}
+	state.LagoID = types.StringValue(metric.LagoID.String())
 	state.Name = types.StringValue(metric.Name)
 	state.Code = types.StringValue(metric.Code)
-	state.AggregationType = types.StringValue(metric.AggregationType)
+	state.AggregationType = types.StringValue(string(metric.AggregationType))
 	state.Recurring = types.BoolValue(metric.Recurring)
 
 	if metric.Description == "" {
@@ -366,10 +335,10 @@ func mapBillableMetricToModel(metric *client.BillableMetric, base billableMetric
 		state.Expression = types.StringValue(metric.Expression)
 	}
 
-	if metric.WeightedInterval == "" {
+	if metric.WeightedInterval == nil {
 		state.WeightedInterval = types.StringNull()
 	} else {
-		state.WeightedInterval = types.StringValue(metric.WeightedInterval)
+		state.WeightedInterval = types.StringValue(string(*metric.WeightedInterval))
 	}
 
 	filters, diags := flattenFilters(metric.Filters)
@@ -379,17 +348,14 @@ func mapBillableMetricToModel(metric *client.BillableMetric, base billableMetric
 		state.Filters = filters
 	}
 
-	if metric.CreatedAt == "" {
+	if metric.CreatedAt.IsZero() {
 		state.CreatedAt = types.StringNull()
 	} else {
-		state.CreatedAt = types.StringValue(metric.CreatedAt)
+		state.CreatedAt = types.StringValue(metric.CreatedAt.Format(time.RFC3339))
 	}
 
-	if metric.UpdatedAt == "" {
-		state.UpdatedAt = types.StringNull()
-	} else {
-		state.UpdatedAt = types.StringValue(metric.UpdatedAt)
-	}
+	// lago.BillableMetric has no UpdatedAt field; always null
+	state.UpdatedAt = types.StringNull()
 
 	return state
 }
@@ -408,7 +374,7 @@ func filterObjectType() types.ObjectType {
 	}
 }
 
-func expandFilters(ctx context.Context, filters types.Set) ([]client.BillableMetricFilter, diag.Diagnostics) {
+func expandFilters(ctx context.Context, filters types.Set) ([]lago.BillableMetricFilter, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if filters.IsNull() {
 		return nil, diags
@@ -424,7 +390,7 @@ func expandFilters(ctx context.Context, filters types.Set) ([]client.BillableMet
 		return nil, diags
 	}
 
-	out := make([]client.BillableMetricFilter, 0, len(models))
+	out := make([]lago.BillableMetricFilter, 0, len(models))
 	for _, model := range models {
 		if model.Key.IsNull() || model.Key.IsUnknown() {
 			diags.AddError("Invalid filter key", "Each filter requires a known `key` value.")
@@ -441,7 +407,7 @@ func expandFilters(ctx context.Context, filters types.Set) ([]client.BillableMet
 			return nil, diags
 		}
 
-		out = append(out, client.BillableMetricFilter{
+		out = append(out, lago.BillableMetricFilter{
 			Key:    model.Key.ValueString(),
 			Values: values,
 		})
@@ -450,7 +416,7 @@ func expandFilters(ctx context.Context, filters types.Set) ([]client.BillableMet
 	return out, diags
 }
 
-func flattenFilters(filters []client.BillableMetricFilter) (types.Set, diag.Diagnostics) {
+func flattenFilters(filters []lago.BillableMetricFilter) (types.Set, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if len(filters) == 0 {
 		return types.SetNull(filterObjectType()), diags

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	lago "github.com/getlago/lago-go-client"
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -19,7 +21,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	"github.com/rpcpool/terraform-provider-lago/internal/client"
 )
 
 var (
@@ -40,7 +41,7 @@ func NewPlanResource() resource.Resource {
 }
 
 type planResource struct {
-	client *client.Client
+	client *lago.Client
 }
 
 type planResourceModel struct {
@@ -104,15 +105,6 @@ type planUsageThresholdModel struct {
 	AmountCents          types.Int64  `tfsdk:"amount_cents"`
 	ThresholdDisplayName types.String `tfsdk:"threshold_display_name"`
 	Recurring            types.Bool   `tfsdk:"recurring"`
-	PropertiesJSON       types.String `tfsdk:"properties_json"`
-}
-
-type planEntitlementModel struct {
-	Code           types.String `tfsdk:"code"`
-	Name           types.String `tfsdk:"name"`
-	Description    types.String `tfsdk:"description"`
-	Recurring      types.Bool   `tfsdk:"recurring"`
-	PrivilegesJSON types.String `tfsdk:"privileges_json"`
 }
 
 func (r *planResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -151,7 +143,7 @@ func (r *planResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"charges": schema.ListNestedAttribute{
 				Optional: true,
 				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
-					"billable_metric_id":   schema.StringAttribute{Required: true},
+					"billable_metric_id":   schema.StringAttribute{Required: true, MarkdownDescription: "UUID of the billable metric."},
 					"charge_model":         schema.StringAttribute{Required: true},
 					"invoiceable":          schema.BoolAttribute{Optional: true},
 					"invoice_display_name": schema.StringAttribute{Optional: true},
@@ -175,7 +167,7 @@ func (r *planResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"fixed_charges": schema.ListNestedAttribute{
 				Optional: true,
 				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
-					"add_on_id":            schema.StringAttribute{Optional: true},
+					"add_on_id":            schema.StringAttribute{Optional: true, MarkdownDescription: "UUID of the add-on."},
 					"add_on_code":          schema.StringAttribute{Optional: true},
 					"charge_model":         schema.StringAttribute{Optional: true},
 					"invoice_display_name": schema.StringAttribute{Optional: true},
@@ -192,17 +184,14 @@ func (r *planResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					"amount_cents":           schema.Int64Attribute{Optional: true},
 					"threshold_display_name": schema.StringAttribute{Optional: true},
 					"recurring":              schema.BoolAttribute{Optional: true},
-					"properties_json":        schema.StringAttribute{Optional: true},
 				}},
 			},
 			"entitlements": schema.ListNestedAttribute{
-				Optional: true,
+				Computed: true,
 				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
-					"code":            schema.StringAttribute{Required: true},
-					"name":            schema.StringAttribute{Optional: true},
-					"description":     schema.StringAttribute{Optional: true},
-					"recurring":       schema.BoolAttribute{Optional: true},
-					"privileges_json": schema.StringAttribute{Optional: true},
+					"code":        schema.StringAttribute{Computed: true},
+					"name":        schema.StringAttribute{Computed: true},
+					"description": schema.StringAttribute{Computed: true},
 				}},
 			},
 			"created_at": schema.StringAttribute{Computed: true},
@@ -232,15 +221,15 @@ func (r *planResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	input, diags := expandCreatePlanInput(ctx, plan)
+	input, diags := expandPlanInput(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	created, err := r.client.CreatePlan(ctx, input)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Creating Lago Plan", err.Error())
+	created, lagoErr := r.client.Plan().Create(ctx, &input)
+	if lagoErr != nil {
+		resp.Diagnostics.AddError("Error Creating Lago Plan", lagoErr.Error())
 		return
 	}
 
@@ -259,13 +248,13 @@ func (r *planResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	plan, err := r.client.GetPlanByCode(ctx, state.Code.ValueString())
-	if err != nil {
-		if client.IsNotFound(err) {
+	plan, lagoErr := r.client.Plan().Get(ctx, state.Code.ValueString())
+	if lagoErr != nil {
+		if isNotFound(lagoErr) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error Reading Lago Plan", err.Error())
+		resp.Diagnostics.AddError("Error Reading Lago Plan", lagoErr.Error())
 		return
 	}
 
@@ -284,15 +273,15 @@ func (r *planResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	input, diags := expandUpdatePlanInput(ctx, plan)
+	input, diags := expandPlanInput(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	updated, err := r.client.UpdatePlanByCode(ctx, plan.Code.ValueString(), input)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Updating Lago Plan", err.Error())
+	updated, lagoErr := r.client.Plan().Update(ctx, &input)
+	if lagoErr != nil {
+		resp.Diagnostics.AddError("Error Updating Lago Plan", lagoErr.Error())
 		return
 	}
 
@@ -311,8 +300,9 @@ func (r *planResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	if err := r.client.DeletePlanByCode(ctx, state.Code.ValueString()); err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Error Deleting Lago Plan", err.Error())
+	_, lagoErr := r.client.Plan().Delete(ctx, state.Code.ValueString())
+	if lagoErr != nil && !isNotFound(lagoErr) {
+		resp.Diagnostics.AddError("Error Deleting Lago Plan", lagoErr.Error())
 	}
 }
 
@@ -321,39 +311,28 @@ func (r *planResource) ImportState(ctx context.Context, req resource.ImportState
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("code"), req.ID)...)
 }
 
-func expandCreatePlanInput(ctx context.Context, plan planResourceModel) (client.CreatePlanInput, diag.Diagnostics) {
+func expandPlanInput(ctx context.Context, plan planResourceModel) (lago.PlanInput, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	input := client.CreatePlanInput{
-		Name:           plan.Name.ValueString(),
-		Code:           plan.Code.ValueString(),
-		Interval:       plan.Interval.ValueString(),
-		AmountCents:    plan.AmountCents.ValueInt64(),
-		AmountCurrency: plan.AmountCurrency.ValueString(),
+	input := lago.PlanInput{
+		Name:               plan.Name.ValueString(),
+		Code:               plan.Code.ValueString(),
+		Interval:           lago.PlanInterval(plan.Interval.ValueString()),
+		AmountCents:        int(plan.AmountCents.ValueInt64()),
+		AmountCurrency:     lago.Currency(plan.AmountCurrency.ValueString()),
+		PayInAdvance:       plan.PayInAdvance.ValueBool(),
+		BillChargesMonthly: plan.BillChargesMonthly.ValueBool(),
+		TrialPeriod:        float32(plan.TrialPeriod.ValueInt64()),
 	}
 
 	if !plan.Description.IsNull() {
-		d := plan.Description.ValueString()
-		input.Description = &d
+		input.Description = plan.Description.ValueString()
 	}
-	if !plan.TrialPeriod.IsNull() {
-		t := plan.TrialPeriod.ValueInt64()
-		input.TrialPeriod = &t
-	}
-	if !plan.PayInAdvance.IsNull() {
-		v := plan.PayInAdvance.ValueBool()
-		input.PayInAdvance = &v
-	}
-	if !plan.BillChargesMonthly.IsNull() {
-		v := plan.BillChargesMonthly.ValueBool()
-		input.BillChargesMonthly = &v
+	if !plan.InvoiceDisplayName.IsNull() {
+		input.InvoiceDisplayName = plan.InvoiceDisplayName.ValueString()
 	}
 	if !plan.BillFixedChargesMonthly.IsNull() {
 		v := plan.BillFixedChargesMonthly.ValueBool()
 		input.BillFixedChargesMonthly = &v
-	}
-	if !plan.InvoiceDisplayName.IsNull() {
-		v := plan.InvoiceDisplayName.ValueString()
-		input.InvoiceDisplayName = &v
 	}
 
 	taxCodes, tdiags := expandStringSet(ctx, plan.TaxCodes)
@@ -380,75 +359,46 @@ func expandCreatePlanInput(ctx context.Context, plan planResourceModel) (client.
 	diags.Append(udiags...)
 	input.UsageThresholds = usageThresholds
 
-	entitlements, ediags := expandEntitlements(ctx, plan.Entitlements)
-	diags.Append(ediags...)
-	input.Entitlements = entitlements
-
 	return input, diags
 }
 
-func expandUpdatePlanInput(ctx context.Context, plan planResourceModel) (client.UpdatePlanInput, diag.Diagnostics) {
-	createInput, diags := expandCreatePlanInput(ctx, plan)
-
-	input := client.UpdatePlanInput{}
-	name := createInput.Name
-	input.Name = &name
-	description := createInput.Description
-	input.Description = description
-	interval := createInput.Interval
-	input.Interval = &interval
-	amountCents := createInput.AmountCents
-	input.AmountCents = &amountCents
-	amountCurrency := createInput.AmountCurrency
-	input.AmountCurrency = &amountCurrency
-	input.TrialPeriod = createInput.TrialPeriod
-	input.PayInAdvance = createInput.PayInAdvance
-	input.BillChargesMonthly = createInput.BillChargesMonthly
-	input.BillFixedChargesMonthly = createInput.BillFixedChargesMonthly
-	input.InvoiceDisplayName = createInput.InvoiceDisplayName
-	input.TaxCodes = createInput.TaxCodes
-	input.Metadata = createInput.Metadata
-	input.Charges = createInput.Charges
-	input.MinimumCommitment = createInput.MinimumCommitment
-	input.FixedCharges = createInput.FixedCharges
-	input.UsageThresholds = createInput.UsageThresholds
-	input.Entitlements = createInput.Entitlements
-
-	return input, diags
-}
-
-func mapPlanToModel(plan *client.Plan, base planResourceModel) (planResourceModel, diag.Diagnostics) {
+func mapPlanToModel(p *lago.Plan, base planResourceModel) (planResourceModel, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	state := base
-	state.ID = types.StringValue(plan.Code)
-	state.LagoID = stringOrNull(plan.LagoID)
-	state.Name = types.StringValue(plan.Name)
-	state.Code = types.StringValue(plan.Code)
-	state.Interval = types.StringValue(plan.Interval)
-	state.Description = stringOrNull(plan.Description)
-	state.AmountCents = types.Int64Value(plan.AmountCents)
-	state.AmountCurrency = stringOrNull(plan.AmountCurrency)
-	state.TrialPeriod = types.Int64Value(int64(plan.TrialPeriod))
-	state.PayInAdvance = types.BoolValue(plan.PayInAdvance)
-	state.BillChargesMonthly = types.BoolValue(plan.BillChargesMonthly)
-	state.BillFixedChargesMonthly = types.BoolValue(plan.BillFixedChargesMonthly)
-	state.InvoiceDisplayName = stringOrNull(plan.InvoiceDisplayName)
-	state.CreatedAt = stringOrNull(plan.CreatedAt)
-	state.UpdatedAt = stringOrNull(plan.UpdatedAt)
+	state.ID = types.StringValue(p.Code)
+	state.LagoID = types.StringValue(p.LagoID.String())
+	state.Name = types.StringValue(p.Name)
+	state.Code = types.StringValue(p.Code)
+	state.Interval = types.StringValue(string(p.Interval))
+	state.Description = stringOrNull(p.Description)
+	state.AmountCents = types.Int64Value(int64(p.AmountCents))
+	state.AmountCurrency = types.StringValue(string(p.AmountCurrency))
+	state.PayInAdvance = types.BoolValue(p.PayInAdvance)
+	state.BillChargesMonthly = types.BoolValue(p.BillChargesMonthly)
+	state.InvoiceDisplayName = stringOrNull(p.InvoiceDisplayName)
 
-	topLevelTaxCodes := plan.TaxCodes
-	if len(topLevelTaxCodes) == 0 {
-		topLevelTaxCodes = taxCodesFromTaxes(plan.Taxes)
+	if p.BillFixedChargesMonthly != nil {
+		state.BillFixedChargesMonthly = types.BoolValue(*p.BillFixedChargesMonthly)
+	} else {
+		state.BillFixedChargesMonthly = types.BoolValue(false)
 	}
-	taxCodes, tdiags := flattenStringSet(topLevelTaxCodes)
+
+	// lago.Plan has no TrialPeriod field — preserve from prior state
+	// state.TrialPeriod is already set from base
+
+	// lago.Plan has no CreatedAt/UpdatedAt fields
+	state.CreatedAt = types.StringNull()
+	state.UpdatedAt = types.StringNull()
+
+	taxCodes, tdiags := flattenStringSet(taxCodesFromTaxes(p.Taxes))
 	diags.Append(tdiags...)
 	state.TaxCodes = taxCodes
 
-	metadata, mdiags := flattenStringMap(plan.Metadata)
+	metadata, mdiags := flattenStringMap(p.Metadata)
 	diags.Append(mdiags...)
 	state.Metadata = metadata
 
-	charges, cdiags := flattenCharges(plan.Charges)
+	charges, cdiags := flattenCharges(p.Charges)
 	diags.Append(cdiags...)
 	if !base.Charges.IsNull() && !base.Charges.IsUnknown() {
 		// Lago may reorder/normalize charge payloads in create/update responses.
@@ -458,19 +408,19 @@ func mapPlanToModel(plan *client.Plan, base planResourceModel) (planResourceMode
 		state.Charges = charges
 	}
 
-	minimumCommitment, mcdiags := flattenMinimumCommitment(plan.MinimumCommitment)
+	minimumCommitment, mcdiags := flattenMinimumCommitment(p.MinimumCommitment)
 	diags.Append(mcdiags...)
 	state.MinimumCommitment = minimumCommitment
 
-	fixedCharges, fcdiags := flattenFixedCharges(plan.FixedCharges)
+	fixedCharges, fcdiags := flattenFixedCharges(p.FixedCharges)
 	diags.Append(fcdiags...)
 	state.FixedCharges = fixedCharges
 
-	usageThresholds, udiags := flattenUsageThresholds(plan.UsageThresholds)
+	usageThresholds, udiags := flattenUsageThresholds(p.UsageThresholds)
 	diags.Append(udiags...)
 	state.UsageThresholds = usageThresholds
 
-	entitlements, ediags := flattenEntitlements(plan.Entitlements)
+	entitlements, ediags := flattenEntitlements(p.Entitlements)
 	diags.Append(ediags...)
 	state.Entitlements = entitlements
 
@@ -544,26 +494,42 @@ func flattenStringMap(values map[string]string) (types.Map, diag.Diagnostics) {
 	return mapValue, diags
 }
 
-func parseJSONField(value types.String) (json.RawMessage, error) {
+func parseJSONField(value types.String) (map[string]interface{}, error) {
 	if value.IsNull() || strings.TrimSpace(value.ValueString()) == "" {
 		return nil, nil
 	}
 
-	var out any
+	var out map[string]interface{}
 	if err := json.Unmarshal([]byte(value.ValueString()), &out); err != nil {
 		return nil, err
 	}
-	return json.RawMessage([]byte(value.ValueString())), nil
+	return out, nil
 }
 
-func jsonFieldValue(value json.RawMessage) types.String {
-	if len(value) == 0 {
+func parseJSONFiltersField(value types.String) ([]lago.ChargeFilter, error) {
+	if value.IsNull() || strings.TrimSpace(value.ValueString()) == "" {
+		return nil, nil
+	}
+
+	var out []lago.ChargeFilter
+	if err := json.Unmarshal([]byte(value.ValueString()), &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func jsonPropertiesValue(props map[string]interface{}) types.String {
+	if len(props) == 0 {
 		return types.StringNull()
 	}
-	return types.StringValue(string(value))
+	raw, err := json.Marshal(props)
+	if err != nil {
+		return types.StringNull()
+	}
+	return types.StringValue(string(raw))
 }
 
-func chargeFiltersJSONValue(filters []client.PlanChargeFilter) types.String {
+func chargeFiltersJSONValue(filters []lago.ChargeFilter) types.String {
 	if len(filters) == 0 {
 		return types.StringNull()
 	}
@@ -590,7 +556,7 @@ func chargeObjectType() types.ObjectType {
 	}}
 }
 
-func expandCharges(ctx context.Context, value types.List) ([]client.PlanCharge, diag.Diagnostics) {
+func expandCharges(ctx context.Context, value types.List) ([]lago.PlanChargeInput, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if value.IsNull() {
 		return nil, diags
@@ -606,47 +572,47 @@ func expandCharges(ctx context.Context, value types.List) ([]client.PlanCharge, 
 		return nil, diags
 	}
 
-	out := make([]client.PlanCharge, 0, len(models))
+	out := make([]lago.PlanChargeInput, 0, len(models))
 	for _, m := range models {
-		charge := client.PlanCharge{
-			BillableMetricID: m.BillableMetricID.ValueString(),
-			ChargeModel:      m.ChargeModel.ValueString(),
+		bmID, err := uuid.Parse(m.BillableMetricID.ValueString())
+		if err != nil {
+			diags.AddError("Invalid billable_metric_id", fmt.Sprintf("Must be a valid UUID: %s", err))
+			return nil, diags
+		}
+		charge := lago.PlanChargeInput{
+			BillableMetricID: bmID,
+			ChargeModel:      lago.ChargeModel(m.ChargeModel.ValueString()),
 		}
 		if !m.Invoiceable.IsNull() {
-			v := m.Invoiceable.ValueBool()
-			charge.Invoiceable = &v
-		}
-		if !m.InvoiceDisplayName.IsNull() {
-			v := m.InvoiceDisplayName.ValueString()
-			charge.InvoiceDisplayName = &v
+			charge.Invoiceable = m.Invoiceable.ValueBool()
 		}
 		if !m.PayInAdvance.IsNull() {
-			v := m.PayInAdvance.ValueBool()
-			charge.PayInAdvance = &v
+			charge.PayInAdvance = m.PayInAdvance.ValueBool()
 		}
 		if !m.RegroupPaidFees.IsNull() {
-			v := m.RegroupPaidFees.ValueBool()
-			charge.RegroupPaidFees = &v
+			if m.RegroupPaidFees.ValueBool() {
+				charge.RegroupPaidFees = "included"
+			} else {
+				charge.RegroupPaidFees = ""
+			}
 		}
 		if !m.Prorated.IsNull() {
-			v := m.Prorated.ValueBool()
-			charge.Prorated = &v
+			charge.Prorated = m.Prorated.ValueBool()
 		}
 		if !m.MinAmountCents.IsNull() {
-			v := m.MinAmountCents.ValueInt64()
-			charge.MinAmountCents = &v
+			charge.MinAmountCents = int(m.MinAmountCents.ValueInt64())
 		}
 		if !m.PropertiesJSON.IsNull() {
-			raw, err := parseJSONField(m.PropertiesJSON)
+			props, err := parseJSONField(m.PropertiesJSON)
 			if err != nil {
 				diags.AddError("Invalid charge properties_json", err.Error())
 				return nil, diags
 			}
-			charge.Properties = raw
+			charge.Properties = props
 		}
 		if !m.FiltersJSON.IsNull() {
-			var filters []client.PlanChargeFilter
-			if err := json.Unmarshal([]byte(m.FiltersJSON.ValueString()), &filters); err != nil {
+			filters, err := parseJSONFiltersField(m.FiltersJSON)
+			if err != nil {
 				diags.AddError("Invalid charge filters_json", err.Error())
 				return nil, diags
 			}
@@ -664,7 +630,7 @@ func expandCharges(ctx context.Context, value types.List) ([]client.PlanCharge, 
 	return out, diags
 }
 
-func flattenCharges(charges []client.PlanCharge) (types.List, diag.Diagnostics) {
+func flattenCharges(charges []lago.Charge) (types.List, diag.Diagnostics) {
 	if len(charges) == 0 {
 		return types.ListNull(chargeObjectType()), nil
 	}
@@ -672,29 +638,23 @@ func flattenCharges(charges []client.PlanCharge) (types.List, diag.Diagnostics) 
 	values := make([]attr.Value, 0, len(charges))
 	var diags diag.Diagnostics
 	for _, charge := range charges {
-		chargeTaxCodes := charge.TaxCodes
-		if len(chargeTaxCodes) == 0 {
-			chargeTaxCodes = taxCodesFromTaxes(charge.Taxes)
-		}
+		chargeTaxCodes := taxCodesFromTaxes(charge.Taxes)
 		taxCodes, tdiags := flattenStringSet(chargeTaxCodes)
 		diags.Append(tdiags...)
 		if diags.HasError() {
 			return types.ListNull(chargeObjectType()), diags
 		}
-		billableMetricID := charge.BillableMetricID
-		if strings.TrimSpace(billableMetricID) == "" {
-			billableMetricID = charge.LagoBillableMetricID
-		}
+		regroupPaidFees := charge.RegroupPaidFees == "included"
 		attrs := map[string]attr.Value{
-			"billable_metric_id":   stringOrNull(billableMetricID),
-			"charge_model":         stringOrNull(charge.ChargeModel),
-			"invoiceable":          boolPtrOrNull(charge.Invoiceable),
-			"invoice_display_name": stringPtrOrNull(charge.InvoiceDisplayName),
-			"pay_in_advance":       boolPtrOrNull(charge.PayInAdvance),
-			"regroup_paid_fees":    boolPtrOrNull(charge.RegroupPaidFees),
-			"prorated":             boolPtrOrNull(charge.Prorated),
-			"min_amount_cents":     int64PtrOrNull(charge.MinAmountCents),
-			"properties_json":      jsonFieldValue(charge.Properties),
+			"billable_metric_id":   types.StringValue(charge.LagoBillableMetricID.String()),
+			"charge_model":         types.StringValue(string(charge.ChargeModel)),
+			"invoiceable":          types.BoolValue(charge.Invoiceable),
+			"invoice_display_name": stringOrNull(charge.InvoiceDisplayName),
+			"pay_in_advance":       types.BoolValue(charge.PayInAdvance),
+			"regroup_paid_fees":    types.BoolValue(regroupPaidFees),
+			"prorated":             types.BoolValue(charge.Prorated),
+			"min_amount_cents":     types.Int64Value(int64(charge.MinAmountCents)),
+			"properties_json":      jsonPropertiesValue(charge.Properties),
 			"filters_json":         chargeFiltersJSONValue(charge.Filters),
 			"tax_codes":            taxCodes,
 		}
@@ -714,7 +674,7 @@ func minimumCommitmentObjectType() types.ObjectType {
 	}}
 }
 
-func expandMinimumCommitment(ctx context.Context, value types.Object) (*client.PlanMinimumCommitment, diag.Diagnostics) {
+func expandMinimumCommitment(ctx context.Context, value types.Object) (*lago.MinimumCommitmentInput, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if value.IsNull() {
 		return nil, diags
@@ -730,10 +690,9 @@ func expandMinimumCommitment(ctx context.Context, value types.Object) (*client.P
 		return nil, diags
 	}
 
-	out := &client.PlanMinimumCommitment{AmountCents: model.AmountCents.ValueInt64()}
+	out := &lago.MinimumCommitmentInput{AmountCents: int(model.AmountCents.ValueInt64())}
 	if !model.InvoiceDisplayName.IsNull() {
-		v := model.InvoiceDisplayName.ValueString()
-		out.InvoiceDisplayName = &v
+		out.InvoiceDisplayName = model.InvoiceDisplayName.ValueString()
 	}
 	taxCodes, tdiags := expandStringSet(ctx, model.TaxCodes)
 	diags.Append(tdiags...)
@@ -744,23 +703,19 @@ func expandMinimumCommitment(ctx context.Context, value types.Object) (*client.P
 	return out, diags
 }
 
-func flattenMinimumCommitment(value *client.PlanMinimumCommitment) (types.Object, diag.Diagnostics) {
+func flattenMinimumCommitment(value *lago.MinimumCommitment) (types.Object, diag.Diagnostics) {
 	if value == nil {
 		return types.ObjectNull(minimumCommitmentObjectType().AttrTypes), nil
 	}
 
-	minimumCommitmentTaxCodes := value.TaxCodes
-	if len(minimumCommitmentTaxCodes) == 0 {
-		minimumCommitmentTaxCodes = taxCodesFromTaxes(value.Taxes)
-	}
-	taxCodes, diags := flattenStringSet(minimumCommitmentTaxCodes)
+	taxCodes, diags := flattenStringSet(taxCodesFromTaxes(value.Taxes))
 	if diags.HasError() {
 		return types.ObjectNull(minimumCommitmentObjectType().AttrTypes), diags
 	}
 
 	obj, odiags := types.ObjectValue(minimumCommitmentObjectType().AttrTypes, map[string]attr.Value{
-		"amount_cents":         types.Int64Value(value.AmountCents),
-		"invoice_display_name": stringPtrOrNull(value.InvoiceDisplayName),
+		"amount_cents":         types.Int64Value(int64(value.AmountCents)),
+		"invoice_display_name": stringOrNull(value.InvoiceDisplayName),
 		"tax_codes":            taxCodes,
 	})
 	diags.Append(odiags...)
@@ -781,7 +736,7 @@ func fixedChargeObjectType() types.ObjectType {
 	}}
 }
 
-func expandFixedCharges(ctx context.Context, value types.List) ([]client.PlanFixedCharge, diag.Diagnostics) {
+func expandFixedCharges(ctx context.Context, value types.List) ([]lago.FixedChargeInput, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if value.IsNull() {
 		return nil, diags
@@ -797,41 +752,51 @@ func expandFixedCharges(ctx context.Context, value types.List) ([]client.PlanFix
 		return nil, diags
 	}
 
-	out := make([]client.PlanFixedCharge, 0, len(models))
+	out := make([]lago.FixedChargeInput, 0, len(models))
 	for _, m := range models {
-		fc := client.PlanFixedCharge{}
+		fc := lago.FixedChargeInput{}
 		if !m.AddOnID.IsNull() {
-			fc.AddOnID = m.AddOnID.ValueString()
-		}
-		if !m.AddOnCode.IsNull() {
-			fc.AddOnCode = m.AddOnCode.ValueString()
+			addOnID, err := uuid.Parse(m.AddOnID.ValueString())
+			if err != nil {
+				diags.AddError("Invalid add_on_id", fmt.Sprintf("Must be a valid UUID: %s", err))
+				return nil, diags
+			}
+			fc.AddOnID = addOnID
 		}
 		if !m.ChargeModel.IsNull() {
-			fc.ChargeModel = m.ChargeModel.ValueString()
+			fc.ChargeModel = lago.FixedChargeModel(m.ChargeModel.ValueString())
 		}
 		if !m.InvoiceDisplayName.IsNull() {
-			v := m.InvoiceDisplayName.ValueString()
-			fc.InvoiceDisplayName = &v
+			fc.InvoiceDisplayName = m.InvoiceDisplayName.ValueString()
 		}
 		if !m.PayInAdvance.IsNull() {
-			v := m.PayInAdvance.ValueBool()
-			fc.PayInAdvance = &v
+			fc.PayInAdvance = m.PayInAdvance.ValueBool()
 		}
 		if !m.Prorated.IsNull() {
-			v := m.Prorated.ValueBool()
-			fc.Prorated = &v
+			fc.Prorated = m.Prorated.ValueBool()
 		}
 		if !m.Units.IsNull() {
-			v := m.Units.ValueInt64()
-			fc.Units = &v
+			fc.Units = float64(m.Units.ValueInt64())
 		}
 		if !m.PropertiesJSON.IsNull() {
-			raw, err := parseJSONField(m.PropertiesJSON)
+			props, err := parseJSONField(m.PropertiesJSON)
 			if err != nil {
 				diags.AddError("Invalid fixed_charge properties_json", err.Error())
 				return nil, diags
 			}
-			fc.Properties = raw
+			if props != nil {
+				raw, err := json.Marshal(props)
+				if err != nil {
+					diags.AddError("Invalid fixed_charge properties_json", err.Error())
+					return nil, diags
+				}
+				var fcp lago.FixedChargeProperties
+				if err := json.Unmarshal(raw, &fcp); err != nil {
+					diags.AddError("Invalid fixed_charge properties_json", err.Error())
+					return nil, diags
+				}
+				fc.Properties = &fcp
+			}
 		}
 		taxCodes, tdiags := expandStringSet(ctx, m.TaxCodes)
 		diags.Append(tdiags...)
@@ -845,7 +810,7 @@ func expandFixedCharges(ctx context.Context, value types.List) ([]client.PlanFix
 	return out, diags
 }
 
-func flattenFixedCharges(values []client.PlanFixedCharge) (types.List, diag.Diagnostics) {
+func flattenFixedCharges(values []lago.FixedCharge) (types.List, diag.Diagnostics) {
 	if len(values) == 0 {
 		return types.ListNull(fixedChargeObjectType()), nil
 	}
@@ -853,28 +818,31 @@ func flattenFixedCharges(values []client.PlanFixedCharge) (types.List, diag.Diag
 	out := make([]attr.Value, 0, len(values))
 	var diags diag.Diagnostics
 	for _, v := range values {
-		fixedChargeTaxCodes := v.TaxCodes
-		if len(fixedChargeTaxCodes) == 0 {
-			fixedChargeTaxCodes = taxCodesFromTaxes(v.Taxes)
-		}
-		taxCodes, tdiags := flattenStringSet(fixedChargeTaxCodes)
+		taxCodes, tdiags := flattenStringSet(taxCodesFromTaxes(v.Taxes))
 		diags.Append(tdiags...)
 		if diags.HasError() {
 			return types.ListNull(fixedChargeObjectType()), diags
 		}
-		addOnID := v.AddOnID
-		if strings.TrimSpace(addOnID) == "" {
-			addOnID = v.LagoAddOnID
+		var propertiesJSON types.String
+		if v.Properties != nil {
+			raw, err := json.Marshal(v.Properties)
+			if err == nil {
+				propertiesJSON = types.StringValue(string(raw))
+			} else {
+				propertiesJSON = types.StringNull()
+			}
+		} else {
+			propertiesJSON = types.StringNull()
 		}
 		out = append(out, types.ObjectValueMust(fixedChargeObjectType().AttrTypes, map[string]attr.Value{
-			"add_on_id":            stringOrNull(addOnID),
+			"add_on_id":            types.StringValue(v.LagoAddOnID.String()),
 			"add_on_code":          stringOrNull(v.AddOnCode),
-			"charge_model":         stringOrNull(v.ChargeModel),
-			"invoice_display_name": stringPtrOrNull(v.InvoiceDisplayName),
-			"pay_in_advance":       boolPtrOrNull(v.PayInAdvance),
-			"prorated":             boolPtrOrNull(v.Prorated),
-			"units":                int64PtrOrNull(v.Units),
-			"properties_json":      jsonFieldValue(v.Properties),
+			"charge_model":         types.StringValue(string(v.ChargeModel)),
+			"invoice_display_name": stringOrNull(v.InvoiceDisplayName),
+			"pay_in_advance":       types.BoolValue(v.PayInAdvance),
+			"prorated":             types.BoolValue(v.Prorated),
+			"units":                types.Int64Value(int64(v.Units)),
+			"properties_json":      propertiesJSON,
 			"tax_codes":            taxCodes,
 		}))
 	}
@@ -889,11 +857,10 @@ func usageThresholdObjectType() types.ObjectType {
 		"amount_cents":           types.Int64Type,
 		"threshold_display_name": types.StringType,
 		"recurring":              types.BoolType,
-		"properties_json":        types.StringType,
 	}}
 }
 
-func expandUsageThresholds(ctx context.Context, value types.List) ([]client.PlanUsageThreshold, diag.Diagnostics) {
+func expandUsageThresholds(ctx context.Context, value types.List) ([]lago.UsageThresholdInput, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if value.IsNull() {
 		return nil, diags
@@ -909,28 +876,17 @@ func expandUsageThresholds(ctx context.Context, value types.List) ([]client.Plan
 		return nil, diags
 	}
 
-	out := make([]client.PlanUsageThreshold, 0, len(models))
+	out := make([]lago.UsageThresholdInput, 0, len(models))
 	for _, m := range models {
-		ut := client.PlanUsageThreshold{}
+		ut := lago.UsageThresholdInput{}
 		if !m.AmountCents.IsNull() {
-			v := m.AmountCents.ValueInt64()
-			ut.AmountCents = &v
+			ut.AmountCents = int(m.AmountCents.ValueInt64())
 		}
 		if !m.ThresholdDisplayName.IsNull() {
-			v := m.ThresholdDisplayName.ValueString()
-			ut.ThresholdDisplayName = &v
+			ut.ThresholdDisplayName = m.ThresholdDisplayName.ValueString()
 		}
 		if !m.Recurring.IsNull() {
-			v := m.Recurring.ValueBool()
-			ut.Recurring = &v
-		}
-		if !m.PropertiesJSON.IsNull() {
-			raw, err := parseJSONField(m.PropertiesJSON)
-			if err != nil {
-				diags.AddError("Invalid usage_threshold properties_json", err.Error())
-				return nil, diags
-			}
-			ut.Properties = raw
+			ut.Recurring = m.Recurring.ValueBool()
 		}
 		out = append(out, ut)
 	}
@@ -938,7 +894,7 @@ func expandUsageThresholds(ctx context.Context, value types.List) ([]client.Plan
 	return out, diags
 }
 
-func flattenUsageThresholds(values []client.PlanUsageThreshold) (types.List, diag.Diagnostics) {
+func flattenUsageThresholds(values []lago.UsageThreshold) (types.List, diag.Diagnostics) {
 	if len(values) == 0 {
 		return types.ListNull(usageThresholdObjectType()), nil
 	}
@@ -946,10 +902,9 @@ func flattenUsageThresholds(values []client.PlanUsageThreshold) (types.List, dia
 	out := make([]attr.Value, 0, len(values))
 	for _, v := range values {
 		out = append(out, types.ObjectValueMust(usageThresholdObjectType().AttrTypes, map[string]attr.Value{
-			"amount_cents":           int64PtrOrNull(v.AmountCents),
-			"threshold_display_name": stringPtrOrNull(v.ThresholdDisplayName),
-			"recurring":              boolPtrOrNull(v.Recurring),
-			"properties_json":        jsonFieldValue(v.Properties),
+			"amount_cents":           types.Int64Value(int64(v.AmountCents)),
+			"threshold_display_name": stringOrNull(v.ThresholdDisplayName),
+			"recurring":              types.BoolValue(v.Recurring),
 		}))
 	}
 
@@ -959,59 +914,13 @@ func flattenUsageThresholds(values []client.PlanUsageThreshold) (types.List, dia
 
 func entitlementObjectType() types.ObjectType {
 	return types.ObjectType{AttrTypes: map[string]attr.Type{
-		"code":            types.StringType,
-		"name":            types.StringType,
-		"description":     types.StringType,
-		"recurring":       types.BoolType,
-		"privileges_json": types.StringType,
+		"code":        types.StringType,
+		"name":        types.StringType,
+		"description": types.StringType,
 	}}
 }
 
-func expandEntitlements(ctx context.Context, value types.List) ([]client.PlanEntitlement, diag.Diagnostics) {
-	var diags diag.Diagnostics
-	if value.IsNull() {
-		return nil, diags
-	}
-	if value.IsUnknown() {
-		diags.AddError("Invalid entitlements", "`entitlements` contains unknown values")
-		return nil, diags
-	}
-
-	var models []planEntitlementModel
-	diags.Append(value.ElementsAs(ctx, &models, false)...)
-	if diags.HasError() {
-		return nil, diags
-	}
-
-	out := make([]client.PlanEntitlement, 0, len(models))
-	for _, m := range models {
-		e := client.PlanEntitlement{Code: m.Code.ValueString()}
-		if !m.Name.IsNull() {
-			v := m.Name.ValueString()
-			e.Name = &v
-		}
-		if !m.Description.IsNull() {
-			v := m.Description.ValueString()
-			e.Description = &v
-		}
-		if !m.Recurring.IsNull() {
-			v := m.Recurring.ValueBool()
-			e.Recurring = &v
-		}
-		if !m.PrivilegesJSON.IsNull() {
-			raw, err := parseJSONField(m.PrivilegesJSON)
-			if err != nil {
-				diags.AddError("Invalid entitlement privileges_json", err.Error())
-				return nil, diags
-			}
-			e.Privileges = raw
-		}
-		out = append(out, e)
-	}
-	return out, diags
-}
-
-func flattenEntitlements(values []client.PlanEntitlement) (types.List, diag.Diagnostics) {
+func flattenEntitlements(values []lago.PlanEntitlement) (types.List, diag.Diagnostics) {
 	if len(values) == 0 {
 		return types.ListNull(entitlementObjectType()), nil
 	}
@@ -1019,39 +928,16 @@ func flattenEntitlements(values []client.PlanEntitlement) (types.List, diag.Diag
 	out := make([]attr.Value, 0, len(values))
 	for _, v := range values {
 		out = append(out, types.ObjectValueMust(entitlementObjectType().AttrTypes, map[string]attr.Value{
-			"code":            stringOrNull(v.Code),
-			"name":            stringPtrOrNull(v.Name),
-			"description":     stringPtrOrNull(v.Description),
-			"recurring":       boolPtrOrNull(v.Recurring),
-			"privileges_json": jsonFieldValue(v.Privileges),
+			"code":        stringOrNull(v.Code),
+			"name":        stringOrNull(v.Name),
+			"description": stringOrNull(v.Description),
 		}))
 	}
 	list, diags := types.ListValue(entitlementObjectType(), out)
 	return list, diags
 }
 
-func boolPtrOrNull(value *bool) types.Bool {
-	if value == nil {
-		return types.BoolNull()
-	}
-	return types.BoolValue(*value)
-}
-
-func stringPtrOrNull(value *string) types.String {
-	if value == nil || strings.TrimSpace(*value) == "" {
-		return types.StringNull()
-	}
-	return types.StringValue(*value)
-}
-
-func int64PtrOrNull(value *int64) types.Int64 {
-	if value == nil {
-		return types.Int64Null()
-	}
-	return types.Int64Value(*value)
-}
-
-func taxCodesFromTaxes(taxes []client.Tax) []string {
+func taxCodesFromTaxes(taxes []lago.Tax) []string {
 	if len(taxes) == 0 {
 		return nil
 	}
