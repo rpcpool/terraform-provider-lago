@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
+	lago "github.com/getlago/lago-go-client"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/rpcpool/terraform-provider-lago/internal/client"
 )
 
 func TestValidateWeightedInterval(t *testing.T) {
@@ -56,7 +56,7 @@ func TestFilterExpandFlatten(t *testing.T) {
 		t.Fatalf("expected backend key, got %q", expanded[0].Key)
 	}
 
-	flattened, flattenDiags := flattenFilters([]client.BillableMetricFilter{
+	flattened, flattenDiags := flattenFilters([]lago.BillableMetricFilter{
 		{
 			Key:    "historical",
 			Values: []string{"true", "false"},

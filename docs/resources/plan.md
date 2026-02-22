@@ -80,7 +80,6 @@ variable "lago_api_key" {
 - `bill_fixed_charges_monthly` (Boolean)
 - `charges` (Attributes List) (see [below for nested schema](#nestedatt--charges))
 - `description` (String)
-- `entitlements` (Attributes List) (see [below for nested schema](#nestedatt--entitlements))
 - `fixed_charges` (Attributes List) (see [below for nested schema](#nestedatt--fixed_charges))
 - `invoice_display_name` (String)
 - `metadata` (Map of String)
@@ -93,6 +92,7 @@ variable "lago_api_key" {
 ### Read-Only
 
 - `created_at` (String)
+- `entitlements` (Attributes List) (see [below for nested schema](#nestedatt--entitlements))
 - `id` (String) Terraform resource ID, set to the plan code.
 - `lago_id` (String) Lago internal identifier.
 - `updated_at` (String)
@@ -102,7 +102,7 @@ variable "lago_api_key" {
 
 Required:
 
-- `billable_metric_id` (String)
+- `billable_metric_id` (String) UUID of the billable metric.
 - `charge_model` (String)
 
 Optional:
@@ -118,28 +118,13 @@ Optional:
 - `tax_codes` (Set of String)
 
 
-<a id="nestedatt--entitlements"></a>
-### Nested Schema for `entitlements`
-
-Required:
-
-- `code` (String)
-
-Optional:
-
-- `description` (String)
-- `name` (String)
-- `privileges_json` (String)
-- `recurring` (Boolean)
-
-
 <a id="nestedatt--fixed_charges"></a>
 ### Nested Schema for `fixed_charges`
 
 Optional:
 
 - `add_on_code` (String)
-- `add_on_id` (String)
+- `add_on_id` (String) UUID of the add-on.
 - `charge_model` (String)
 - `invoice_display_name` (String)
 - `pay_in_advance` (Boolean)
@@ -168,6 +153,15 @@ Optional:
 Optional:
 
 - `amount_cents` (Number)
-- `properties_json` (String)
 - `recurring` (Boolean)
 - `threshold_display_name` (String)
+
+
+<a id="nestedatt--entitlements"></a>
+### Nested Schema for `entitlements`
+
+Read-Only:
+
+- `code` (String)
+- `description` (String)
+- `name` (String)

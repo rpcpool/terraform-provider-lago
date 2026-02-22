@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	lago "github.com/getlago/lago-go-client"
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -18,11 +20,13 @@ import (
 func TestPlanExpandFlattenCharges(t *testing.T) {
 	t.Parallel()
 
+	bmID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+
 	objectType := chargeObjectType()
 	setType := types.SetType{ElemType: types.StringType}
 	chargeList := types.ListValueMust(objectType, []attr.Value{
 		types.ObjectValueMust(objectType.AttrTypes, map[string]attr.Value{
-			"billable_metric_id":   types.StringValue("bm_123"),
+			"billable_metric_id":   types.StringValue(bmID.String()),
 			"charge_model":         types.StringValue("standard"),
 			"invoiceable":          types.BoolValue(true),
 			"invoice_display_name": types.StringValue("Requests"),
@@ -43,11 +47,24 @@ func TestPlanExpandFlattenCharges(t *testing.T) {
 	if len(charges) != 1 {
 		t.Fatalf("expected one charge, got %d", len(charges))
 	}
-	if charges[0].BillableMetricID != "bm_123" {
+	if charges[0].BillableMetricID != bmID {
 		t.Fatalf("unexpected billable_metric_id: %s", charges[0].BillableMetricID)
 	}
 
-	flattened, flattenDiags := flattenCharges(charges)
+	// flattenCharges takes []lago.Charge (response type); build one to test the flatten path
+	responseCharges := []lago.Charge{
+		{
+			LagoBillableMetricID: bmID,
+			ChargeModel:          lago.StandardChargeModel,
+			Invoiceable:          true,
+			PayInAdvance:         false,
+			RegroupPaidFees:      "",
+			Prorated:             false,
+			MinAmountCents:       0,
+			Properties:           map[string]interface{}{"amount": "1"},
+		},
+	}
+	flattened, flattenDiags := flattenCharges(responseCharges)
 	if flattenDiags.HasError() {
 		t.Fatalf("unexpected diagnostics flattening charges: %+v", flattenDiags)
 	}
