@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/rpcpool/terraform-provider-lago/compare/v1.4.1...v2.0.0) (2026-02-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* Removes internal Lago API client in favor of the official github.com/getlago/lago-go-client. This changes error handling and removes the internal client package. All resources now use the upstream Go client for API interactions.
+
+### Features
+
+* switch to github.com/getlago/lago-go-client ([9f0d5d5](https://github.com/rpcpool/terraform-provider-lago/commit/9f0d5d5fc4da487aa4cefece02988d09160fce61))
+
 ## [1.4.1](https://github.com/rpcpool/terraform-provider-lago/compare/v1.4.0...v1.4.1) (2026-02-20)
 
 
