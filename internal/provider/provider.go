@@ -129,6 +129,9 @@ func (p *lagoProvider) Resources(_ context.Context) []func() resource.Resource {
 		NewAddOnResource,
 		NewTaxResource,
 		NewCustomerResource,
+		NewWebhookEndpointResource,
+		NewCouponResource,
+		NewSubscriptionResource,
 	}
 }
 
