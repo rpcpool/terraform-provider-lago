@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.0](https://github.com/rpcpool/terraform-provider-lago/compare/v2.1.0...v2.2.0) (2026-02-23)
+
+
+### Features
+
+* add lago_coupon, lago_subscription, and lago_webhook_endpoint ([e9727e0](https://github.com/rpcpool/terraform-provider-lago/commit/e9727e0ccd3506d1c4f380e48877e39382dc611f))
+* add lago_coupon, lago_subscription, and lago_webhook_endpoint resources ([bdf4481](https://github.com/rpcpool/terraform-provider-lago/commit/bdf44814d03b118a628eef080f35b00c10d11d70))
+
 ## [2.1.0](https://github.com/rpcpool/terraform-provider-lago/compare/v2.0.0...v2.1.0) (2026-02-23)
 
 
