@@ -133,6 +133,7 @@ func (p *lagoProvider) Resources(_ context.Context) []func() resource.Resource {
 		NewCouponResource,
 		NewSubscriptionResource,
 		NewWalletResource,
+		NewOrganizationResource,
 	}
 }
 
