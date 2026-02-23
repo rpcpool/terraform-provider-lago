@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.0](https://github.com/rpcpool/terraform-provider-lago/compare/v2.2.0...v2.3.0) (2026-02-23)
+
+
+### Features
+
+* **provider:** add lago_wallet resource ([b322225](https://github.com/rpcpool/terraform-provider-lago/commit/b322225a991d5f690c742195dbe69c86f986ac65))
+* **provider:** add lago_wallet resource ([3030b6d](https://github.com/rpcpool/terraform-provider-lago/commit/3030b6dc25391a377b839174be79d8856a40da1f))
+
 ## [2.2.0](https://github.com/rpcpool/terraform-provider-lago/compare/v2.1.0...v2.2.0) (2026-02-23)
 
 
