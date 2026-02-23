@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.0](https://github.com/rpcpool/terraform-provider-lago/compare/v2.3.0...v2.4.0) (2026-02-23)
+
+
+### Features
+
+* add lago_organization singleton resource ([48cdf6a](https://github.com/rpcpool/terraform-provider-lago/commit/48cdf6a1779edb39c3ca652120c182be01b4f738))
+* add lago_organization singleton resource ([3b089dd](https://github.com/rpcpool/terraform-provider-lago/commit/3b089dd63eae4cb98fb3661e302252a05e75b032))
+
 ## [2.3.0](https://github.com/rpcpool/terraform-provider-lago/compare/v2.2.0...v2.3.0) (2026-02-23)
 
 
