@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.0](https://github.com/rpcpool/terraform-provider-lago/compare/v2.0.0...v2.1.0) (2026-02-23)
+
+
+### Features
+
+* **provider:** add lago_tax, lago_add_on, and lago_customer resources ([1ce0d05](https://github.com/rpcpool/terraform-provider-lago/commit/1ce0d056aa3d113c6bdb32d8ea64d4354699cd77))
+* **provider:** add lago_tax, lago_add_on, and lago_customer resources ([2af071c](https://github.com/rpcpool/terraform-provider-lago/commit/2af071c39cd485b71e5d7c1af274eb3c77b227f6))
+
 ## [2.0.0](https://github.com/rpcpool/terraform-provider-lago/compare/v1.4.1...v2.0.0) (2026-02-22)
 
 
