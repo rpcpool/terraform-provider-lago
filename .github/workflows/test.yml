@@ -117,10 +117,7 @@ jobs:
         cli:
           - name: OpenTofu
             flavor: opentofu
-            version: '1.8.*'
-          - name: OpenTofu
-            flavor: opentofu
-            version: '1.9.*'
+            version: '1.11.*'
           - name: Terraform
             flavor: terraform
             version: '1.14.*'
