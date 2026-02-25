@@ -98,6 +98,7 @@ func (r *billableMetricResource) Schema(_ context.Context, _ resource.SchemaRequ
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"field_name": schema.StringAttribute{
 				Optional:            true,
