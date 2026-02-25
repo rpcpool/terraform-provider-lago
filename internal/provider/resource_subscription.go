@@ -95,6 +95,7 @@ func (r *subscriptionResource) Schema(_ context.Context, _ resource.SchemaReques
 			},
 			"subscription_at": schema.StringAttribute{
 				Optional:            true,
+				Computed:            true,
 				MarkdownDescription: "Start date and time for the subscription (RFC3339). Defaults to the current date when not set.",
 			},
 			"ending_at": schema.StringAttribute{
@@ -114,6 +115,7 @@ func (r *subscriptionResource) Schema(_ context.Context, _ resource.SchemaReques
 			},
 			"on_termination_invoice": schema.StringAttribute{
 				Optional:            true,
+				Computed:            true,
 				MarkdownDescription: "Invoice behaviour on termination. Allowed values: `generate`, `skip`.",
 				Validators: []validator.String{
 					stringvalidator.OneOf("generate", "skip"),

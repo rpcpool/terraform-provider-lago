@@ -149,6 +149,7 @@ func (r *organizationResource) Schema(_ context.Context, _ resource.SchemaReques
 			},
 			"document_numbering": schema.StringAttribute{
 				Optional:            true,
+				Computed:            true,
 				MarkdownDescription: "Invoice document numbering scheme. Allowed values: `per_customer`, `per_organization`.",
 				Validators: []validator.String{
 					stringvalidator.OneOf("per_customer", "per_organization"),
@@ -156,6 +157,7 @@ func (r *organizationResource) Schema(_ context.Context, _ resource.SchemaReques
 			},
 			"document_number_prefix": schema.StringAttribute{
 				Optional:            true,
+				Computed:            true,
 				MarkdownDescription: "Prefix prepended to all generated document numbers.",
 			},
 			"finalize_zero_amount_invoice": schema.BoolAttribute{
@@ -170,18 +172,22 @@ func (r *organizationResource) Schema(_ context.Context, _ resource.SchemaReques
 			},
 			"billing_configuration": schema.SingleNestedAttribute{
 				Optional:            true,
+				Computed:            true,
 				MarkdownDescription: "Organization-level billing configuration.",
 				Attributes: map[string]schema.Attribute{
 					"invoice_grace_period": schema.Int64Attribute{
 						Optional:            true,
+						Computed:            true,
 						MarkdownDescription: "Grace period in days before an invoice is finalized after its billing period ends.",
 					},
 					"invoice_footer": schema.StringAttribute{
 						Optional:            true,
+						Computed:            true,
 						MarkdownDescription: "Footer text that appears on all generated invoices.",
 					},
 					"document_locale": schema.StringAttribute{
 						Optional:            true,
+						Computed:            true,
 						MarkdownDescription: "Locale used when generating invoice documents (e.g. `en`, `fr`, `de`).",
 					},
 				},

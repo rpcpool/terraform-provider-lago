@@ -143,12 +143,7 @@ func TestAccPlanResource(t *testing.T) {
 }
 
 func testAccPlanConfig(code, name string, amountCents int64) string {
-	return fmt.Sprintf(`
-provider "lago" {
-  api_endpoint = "%s"
-  api_key      = "%s"
-}
-
+	return providerConfig() + fmt.Sprintf(`
 resource "lago_plan" "test" {
   name            = "%s"
   code            = "%s"
@@ -157,16 +152,11 @@ resource "lago_plan" "test" {
   amount_currency = "USD"
   pay_in_advance  = false
 }
-`, os.Getenv("LAGO_API_ENDPOINT"), os.Getenv("LAGO_API_KEY"), name, code, amountCents)
+`, name, code, amountCents)
 }
 
 func testAccPlanInvalidIntervalConfig(code string) string {
-	return fmt.Sprintf(`
-provider "lago" {
-  api_endpoint = "%s"
-  api_key      = "%s"
-}
-
+	return providerConfig() + fmt.Sprintf(`
 resource "lago_plan" "test" {
   name            = "Invalid"
   code            = "%s"
@@ -174,5 +164,5 @@ resource "lago_plan" "test" {
   amount_cents    = 1000
   amount_currency = "USD"
 }
-`, os.Getenv("LAGO_API_ENDPOINT"), os.Getenv("LAGO_API_KEY"), code)
+`, code)
 }

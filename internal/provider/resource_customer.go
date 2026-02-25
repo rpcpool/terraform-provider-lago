@@ -167,7 +167,11 @@ func (r *customerResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			},
 			"currency": schema.StringAttribute{
 				Optional:            true,
+				Computed:            true,
 				MarkdownDescription: "Currency code for the customer (e.g. `USD`).",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"timezone": schema.StringAttribute{
 				Optional:            true,
@@ -215,7 +219,11 @@ func (r *customerResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			},
 			"finalize_zero_amount_invoice": schema.StringAttribute{
 				Optional:            true,
+				Computed:            true,
 				MarkdownDescription: "Controls zero-amount invoice behaviour. Allowed values: `finalize`, `skip`, `inherit`.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 				Validators: []validator.String{
 					stringvalidator.OneOf("finalize", "skip", "inherit"),
 				},
@@ -231,18 +239,22 @@ func (r *customerResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Attributes: map[string]schema.Attribute{
 					"invoice_grace_period": schema.Int64Attribute{
 						Optional:            true,
+						Computed:            true,
 						MarkdownDescription: "Grace period in days before an invoice is finalised.",
 					},
 					"payment_provider": schema.StringAttribute{
 						Optional:            true,
+						Computed:            true,
 						MarkdownDescription: "Payment provider identifier (e.g. `stripe`, `adyen`, `gocardless`).",
 					},
 					"payment_provider_code": schema.StringAttribute{
 						Optional:            true,
+						Computed:            true,
 						MarkdownDescription: "Code of the payment provider integration.",
 					},
 					"provider_customer_id": schema.StringAttribute{
 						Optional:            true,
+						Computed:            true,
 						MarkdownDescription: "Customer ID on the payment provider side.",
 					},
 					"sync_with_provider": schema.BoolAttribute{
@@ -251,10 +263,12 @@ func (r *customerResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 					},
 					"document_locale": schema.StringAttribute{
 						Optional:            true,
+						Computed:            true,
 						MarkdownDescription: "Locale for customer documents (e.g. `en`).",
 					},
 					"provider_payment_methods": schema.SetAttribute{
 						Optional:            true,
+						Computed:            true,
 						ElementType:         types.StringType,
 						MarkdownDescription: "Payment methods enabled for the customer on the payment provider.",
 					},
@@ -571,7 +585,7 @@ func expandCustomerBillingConfiguration(ctx context.Context, obj types.Object) (
 		out.DocumentLocale = model.DocumentLocale.ValueString()
 	}
 
-	if !model.ProviderPaymentMethods.IsNull() {
+	if !model.ProviderPaymentMethods.IsNull() && !model.ProviderPaymentMethods.IsUnknown() {
 		var methods []string
 		diags.Append(model.ProviderPaymentMethods.ElementsAs(ctx, &methods, false)...)
 		if diags.HasError() {
@@ -755,7 +769,8 @@ func flattenCustomerBillingConfiguration(ctx context.Context, cfg lago.CustomerB
 	}
 
 	// Preserve sync_with_provider from plan/state (write-only; not in API response).
-	syncWithProvider := types.BoolValue(false)
+	// Default to null (not set) rather than false so Terraform doesn't see spurious drift.
+	syncWithProvider := types.BoolNull()
 	if !baseBillingConfig.IsNull() && !baseBillingConfig.IsUnknown() {
 		var baseModel customerBillingConfigModel
 		diags.Append(baseBillingConfig.As(ctx, &baseModel, basetypes.ObjectAsOptions{})...)
@@ -783,8 +798,15 @@ func flattenCustomerBillingConfiguration(ctx context.Context, cfg lago.CustomerB
 		providerPaymentMethods = types.SetNull(types.StringType)
 	}
 
+	var invoiceGracePeriod types.Int64
+	if cfg.InvoiceGracePeriod == 0 {
+		invoiceGracePeriod = types.Int64Null()
+	} else {
+		invoiceGracePeriod = types.Int64Value(int64(cfg.InvoiceGracePeriod))
+	}
+
 	obj, objDiags := types.ObjectValue(customerBillingConfigObjectType().AttrTypes, map[string]attr.Value{
-		"invoice_grace_period":     types.Int64Value(int64(cfg.InvoiceGracePeriod)),
+		"invoice_grace_period":     invoiceGracePeriod,
 		"payment_provider":         stringOrNull(string(cfg.PaymentProvider)),
 		"payment_provider_code":    stringOrNull(cfg.PaymentProviderCode),
 		"provider_customer_id":     stringOrNull(cfg.ProviderCustomerID),

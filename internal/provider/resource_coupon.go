@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -179,7 +180,7 @@ func (r *couponResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	created, lagoErr := r.client.Coupon().Create(ctx, input)
+	created, lagoErr := couponCreate(ctx, r.client, input)
 	if lagoErr != nil {
 		resp.Diagnostics.AddError("Error Creating Lago Coupon", lagoErr.Error())
 		return
@@ -235,7 +236,7 @@ func (r *couponResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	updated, lagoErr := r.client.Coupon().Update(ctx, input)
+	updated, lagoErr := couponUpdate(ctx, r.client, input)
 	if lagoErr != nil {
 		resp.Diagnostics.AddError("Error Updating Lago Coupon", lagoErr.Error())
 		return
@@ -267,6 +268,96 @@ func (r *couponResource) Delete(ctx context.Context, req resource.DeleteRequest,
 func (r *couponResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("code"), req.ID)...)
+}
+
+// couponInputWire mirrors lago.CouponInput but uses *bool for Reusable so that
+// false is not silently dropped by encoding/json's omitempty on the upstream
+// struct field (lago.CouponInput has `json:"reusable,omitempty"`).
+type couponInputWire struct {
+	Name              string                     `json:"name,omitempty"`
+	Code              string                     `json:"code,omitempty"`
+	Description       string                     `json:"description,omitempty"`
+	AmountCents       int                        `json:"amount_cents,omitempty"`
+	AmountCurrency    lago.Currency              `json:"amount_currency,omitempty"`
+	Expiration        lago.CouponExpiration      `json:"expiration,omitempty"`
+	ExpirationAt      *time.Time                 `json:"expiration_at,omitempty"`
+	PercentageRate    float64                    `json:"percentage_rate,omitempty,string"`
+	CouponType        lago.CouponCalculationType `json:"coupon_type,omitempty"`
+	Frequency         lago.CouponFrequency       `json:"frequency,omitempty"`
+	Reusable          *bool                      `json:"reusable"`
+	FrequencyDuration int                        `json:"frequency_duration,omitempty"`
+	AppliesTo         lago.LimitationInput       `json:"applies_to,omitempty"`
+}
+
+type couponParamsWire struct {
+	Coupon *couponInputWire `json:"coupon"`
+}
+
+func toCouponInputWire(input *lago.CouponInput) *couponInputWire {
+	reusable := input.Reusable
+	return &couponInputWire{
+		Name:              input.Name,
+		Code:              input.Code,
+		Description:       input.Description,
+		AmountCents:       input.AmountCents,
+		AmountCurrency:    input.AmountCurrency,
+		Expiration:        input.Expiration,
+		ExpirationAt:      input.ExpirationAt,
+		PercentageRate:    input.PercentageRate,
+		CouponType:        input.CouponType,
+		Frequency:         input.Frequency,
+		Reusable:          &reusable,
+		FrequencyDuration: input.FrequencyDuration,
+		AppliesTo:         input.AppliesTo,
+	}
+}
+
+func couponCreate(ctx context.Context, client *lago.Client, input *lago.CouponInput) (*lago.Coupon, *lago.Error) {
+	body, err := json.Marshal(couponParamsWire{Coupon: toCouponInputWire(input)})
+	if err != nil {
+		return nil, &lago.Error{Err: err}
+	}
+	result := &lago.CouponResult{}
+	resp, restyErr := client.HttpClient.R().
+		SetContext(ctx).
+		SetError(&lago.Error{}).
+		SetResult(result).
+		SetBody(body).
+		Post("coupons")
+	if restyErr != nil {
+		return nil, &lago.Error{Err: restyErr}
+	}
+	if resp.IsError() {
+		if lagoErr, ok := resp.Error().(*lago.Error); ok {
+			return nil, lagoErr
+		}
+		return nil, &lago.Error{Err: fmt.Errorf("unexpected error response: %s", resp.String())}
+	}
+	return result.Coupon, nil
+}
+
+func couponUpdate(ctx context.Context, client *lago.Client, input *lago.CouponInput) (*lago.Coupon, *lago.Error) {
+	body, err := json.Marshal(couponParamsWire{Coupon: toCouponInputWire(input)})
+	if err != nil {
+		return nil, &lago.Error{Err: err}
+	}
+	result := &lago.CouponResult{}
+	resp, restyErr := client.HttpClient.R().
+		SetContext(ctx).
+		SetError(&lago.Error{}).
+		SetResult(result).
+		SetBody(body).
+		Put(fmt.Sprintf("coupons/%s", input.Code))
+	if restyErr != nil {
+		return nil, &lago.Error{Err: restyErr}
+	}
+	if resp.IsError() {
+		if lagoErr, ok := resp.Error().(*lago.Error); ok {
+			return nil, lagoErr
+		}
+		return nil, &lago.Error{Err: fmt.Errorf("unexpected error response: %s", resp.String())}
+	}
+	return result.Coupon, nil
 }
 
 func expandCouponInput(ctx context.Context, model couponResourceModel) (*lago.CouponInput, diag.Diagnostics) {

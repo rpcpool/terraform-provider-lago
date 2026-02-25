@@ -419,12 +419,7 @@ func TestAccCouponResource(t *testing.T) {
 }
 
 func testAccCouponFixedAmountConfig(code, name string, amountCents int, currency string) string {
-	return fmt.Sprintf(`
-provider "lago" {
-  api_endpoint = "%s"
-  api_key      = "%s"
-}
-
+	return providerConfig() + fmt.Sprintf(`
 resource "lago_coupon" "test" {
   name            = "%s"
   code            = "%s"
@@ -435,5 +430,5 @@ resource "lago_coupon" "test" {
   frequency       = "once"
   reusable        = false
 }
-`, os.Getenv("LAGO_API_ENDPOINT"), os.Getenv("LAGO_API_KEY"), name, code, amountCents, currency)
+`, name, code, amountCents, currency)
 }

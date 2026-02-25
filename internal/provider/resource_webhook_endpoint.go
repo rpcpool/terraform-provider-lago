@@ -16,6 +16,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+// webhookEndpointUpdateParams wraps the input with the JSON key the Lago API requires.
+// The lago-go-client Update method sends the input unwrapped (upstream bug), so we
+// call the HTTP client directly for updates.
+type webhookEndpointUpdateParams struct {
+	WebhookEndpoint *lago.WebhookEndpointInput `json:"webhook_endpoint"`
+}
+
 var (
 	_ resource.Resource                = &webhookEndpointResource{}
 	_ resource.ResourceWithConfigure   = &webhookEndpointResource{}
@@ -147,13 +154,30 @@ func (r *webhookEndpointResource) Update(ctx context.Context, req resource.Updat
 
 	input := expandWebhookEndpointInput(plan)
 
-	updated, lagoErr := r.client.WebhookEndpoint().Update(ctx, input, state.LagoID.ValueString())
-	if lagoErr != nil {
-		resp.Diagnostics.AddError("Error Updating Lago Webhook Endpoint", lagoErr.Error())
+	// The lago-go-client Update method sends the input without the required
+	// "webhook_endpoint" JSON wrapper (upstream bug). Use the HTTP client directly.
+	result := &lago.WebhookEndpointResult{}
+	subPath := fmt.Sprintf("webhook_endpoints/%s", state.LagoID.ValueString())
+	httpResp, httpErr := r.client.HttpClient.R().
+		SetContext(ctx).
+		SetError(&lago.Error{}).
+		SetResult(result).
+		SetBody(webhookEndpointUpdateParams{WebhookEndpoint: input}).
+		Put(subPath)
+	if httpErr != nil {
+		resp.Diagnostics.AddError("Error Updating Lago Webhook Endpoint", httpErr.Error())
+		return
+	}
+	if httpResp.IsError() {
+		if lagoErr, ok := httpResp.Error().(*lago.Error); ok {
+			resp.Diagnostics.AddError("Error Updating Lago Webhook Endpoint", lagoErr.Error())
+		} else {
+			resp.Diagnostics.AddError("Error Updating Lago Webhook Endpoint", httpResp.Status())
+		}
 		return
 	}
 
-	newState := mapWebhookEndpointToModel(updated, plan)
+	newState := mapWebhookEndpointToModel(result.WebhookEndpoint, plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 

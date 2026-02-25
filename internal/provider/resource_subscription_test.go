@@ -379,12 +379,7 @@ func TestAccSubscriptionResource(t *testing.T) {
 }
 
 func testAccSubscriptionConfig(customerExternalID, planCode, subExternalID, billingTime string) string {
-	return fmt.Sprintf(`
-provider "lago" {
-  api_endpoint = "%s"
-  api_key      = "%s"
-}
-
+	return providerConfig() + fmt.Sprintf(`
 resource "lago_customer" "test" {
   external_id = "%s"
   name        = "Terraform Acceptance Test Customer"
@@ -411,6 +406,5 @@ resource "lago_subscription" "test" {
   plan_code            = lago_plan.test.code
   billing_time         = "%s"
 }
-`, os.Getenv("LAGO_API_ENDPOINT"), os.Getenv("LAGO_API_KEY"),
-		customerExternalID, planCode, planCode, subExternalID, billingTime)
+`, customerExternalID, planCode, planCode, subExternalID, billingTime)
 }
