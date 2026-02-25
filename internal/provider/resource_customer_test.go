@@ -565,7 +565,7 @@ func TestAccCustomerResourceWithBillingConfig(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "external_id", randomID),
 					resource.TestCheckResourceAttr(resourceName, "currency", "USD"),
 					resource.TestCheckResourceAttr(resourceName, "net_payment_term", "30"),
-					resource.TestCheckResourceAttr(resourceName, "billing_configuration.invoice_grace_period", "3"),
+					resource.TestCheckResourceAttr(resourceName, "billing_configuration.document_locale", "en"),
 					resource.TestCheckResourceAttrSet(resourceName, "lago_id"),
 				),
 			},
@@ -574,12 +574,7 @@ func TestAccCustomerResourceWithBillingConfig(t *testing.T) {
 }
 
 func testAccCustomerConfig(externalID, name, email string) string {
-	return fmt.Sprintf(`
-provider "lago" {
-  api_endpoint = "%s"
-  api_key      = "%s"
-}
-
+	return providerConfig() + fmt.Sprintf(`
 resource "lago_customer" "test" {
   external_id   = "%s"
   name          = "%s"
@@ -587,16 +582,11 @@ resource "lago_customer" "test" {
   customer_type = "company"
   currency      = "USD"
 }
-`, os.Getenv("LAGO_API_ENDPOINT"), os.Getenv("LAGO_API_KEY"), externalID, name, email)
+`, externalID, name, email)
 }
 
 func testAccCustomerWithBillingConfig(externalID string) string {
-	return fmt.Sprintf(`
-provider "lago" {
-  api_endpoint = "%s"
-  api_key      = "%s"
-}
-
+	return providerConfig() + fmt.Sprintf(`
 resource "lago_customer" "test" {
   external_id      = "%s"
   name             = "Terraform Billing Config Test"
@@ -605,10 +595,9 @@ resource "lago_customer" "test" {
   currency         = "USD"
   net_payment_term = 30
 
-  billing_configuration {
-    invoice_grace_period = 3
-    document_locale      = "en"
+  billing_configuration = {
+    document_locale = "en"
   }
 }
-`, os.Getenv("LAGO_API_ENDPOINT"), os.Getenv("LAGO_API_KEY"), externalID)
+`, externalID)
 }

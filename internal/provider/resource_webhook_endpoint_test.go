@@ -153,15 +153,10 @@ func TestAccWebhookEndpointResource(t *testing.T) {
 }
 
 func testAccWebhookEndpointConfig(webhookURL, signatureAlgo string) string {
-	return fmt.Sprintf(`
-provider "lago" {
-  api_endpoint = "%s"
-  api_key      = "%s"
-}
-
+	return providerConfig() + fmt.Sprintf(`
 resource "lago_webhook_endpoint" "test" {
   webhook_url    = "%s"
   signature_algo = "%s"
 }
-`, os.Getenv("LAGO_API_ENDPOINT"), os.Getenv("LAGO_API_KEY"), webhookURL, signatureAlgo)
+`, webhookURL, signatureAlgo)
 }

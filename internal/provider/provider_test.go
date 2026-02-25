@@ -2,10 +2,21 @@ package provider
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 )
+
+// providerConfig returns the lago provider block for use in acceptance test configs.
+func providerConfig() string {
+	return `
+provider "lago" {
+  api_endpoint = "` + os.Getenv("LAGO_API_ENDPOINT") + `"
+  api_key      = "` + os.Getenv("LAGO_API_KEY") + `"
+}
+`
+}
 
 func TestProviderMetadata(t *testing.T) {
 	t.Parallel()

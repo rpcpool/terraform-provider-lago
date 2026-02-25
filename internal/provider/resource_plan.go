@@ -383,8 +383,11 @@ func mapPlanToModel(p *lago.Plan, base planResourceModel) (planResourceModel, di
 		state.BillFixedChargesMonthly = types.BoolValue(false)
 	}
 
-	// lago.Plan has no TrialPeriod field — preserve from prior state
-	// state.TrialPeriod is already set from base
+	// lago.Plan has no TrialPeriod field — preserve from prior state.
+	// On import the base is empty, so default to 0 (matching the schema default).
+	if state.TrialPeriod.IsNull() || state.TrialPeriod.IsUnknown() {
+		state.TrialPeriod = types.Int64Value(0)
+	}
 
 	// lago.Plan has no CreatedAt/UpdatedAt fields
 	state.CreatedAt = types.StringNull()

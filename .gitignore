@@ -37,3 +37,6 @@ override.tf.json
 # Provider development overrides
 .terraformrc
 terraform.rc
+
+# Ephemeral test secrets
+test/.lago-test-env

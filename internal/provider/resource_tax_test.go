@@ -227,12 +227,7 @@ func TestAccTaxResource(t *testing.T) {
 }
 
 func testAccTaxConfig(code, name string, rate float64, appliedToOrg bool) string {
-	return fmt.Sprintf(`
-provider "lago" {
-  api_endpoint = "%s"
-  api_key      = "%s"
-}
-
+	return providerConfig() + fmt.Sprintf(`
 resource "lago_tax" "test" {
   name                    = "%s"
   code                    = "%s"
@@ -240,5 +235,5 @@ resource "lago_tax" "test" {
   applied_to_organization = %t
   description             = "Terraform acceptance test tax"
 }
-`, os.Getenv("LAGO_API_ENDPOINT"), os.Getenv("LAGO_API_KEY"), name, code, rate, appliedToOrg)
+`, name, code, rate, appliedToOrg)
 }

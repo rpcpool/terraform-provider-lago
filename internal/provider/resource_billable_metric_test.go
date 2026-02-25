@@ -116,12 +116,7 @@ func TestAccBillableMetricResource(t *testing.T) {
 }
 
 func testAccBillableMetricConfig(code, aggregationType, description string) string {
-	return fmt.Sprintf(`
-provider "lago" {
-  api_endpoint = "%s"
-  api_key      = "%s"
-}
-
+	return providerConfig() + fmt.Sprintf(`
 resource "lago_billable_metric" "test" {
   name             = "Terraform Acceptance Test"
   code             = "%s"
@@ -129,21 +124,16 @@ resource "lago_billable_metric" "test" {
   field_name       = "request_count"
   description      = "%s"
 }
-`, os.Getenv("LAGO_API_ENDPOINT"), os.Getenv("LAGO_API_KEY"), code, aggregationType, description)
+`, code, aggregationType, description)
 }
 
 func testAccInvalidWeightedIntervalConfig(code string) string {
-	return fmt.Sprintf(`
-provider "lago" {
-  api_endpoint = "%s"
-  api_key      = "%s"
-}
-
+	return providerConfig() + fmt.Sprintf(`
 resource "lago_billable_metric" "test" {
   name              = "Terraform Acceptance Test"
   code              = "%s"
   aggregation_type  = "sum_agg"
   weighted_interval = "daily"
 }
-`, os.Getenv("LAGO_API_ENDPOINT"), os.Getenv("LAGO_API_KEY"), code)
+`, code)
 }

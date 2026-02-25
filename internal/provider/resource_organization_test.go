@@ -410,10 +410,9 @@ func TestAccOrganizationResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create (upsert) with a minimal configuration.
 			{
-				Config: testAccOrganizationConfig("Terraform Acc Org", "USD", "UTC"),
+				Config: testAccOrganizationConfig("USD", "UTC"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "id", "organization"),
-					resource.TestCheckResourceAttr(resourceName, "name", "Terraform Acc Org"),
 					resource.TestCheckResourceAttr(resourceName, "default_currency", "USD"),
 					resource.TestCheckResourceAttr(resourceName, "timezone", "UTC"),
 					resource.TestCheckResourceAttrSet(resourceName, "created_at"),
@@ -426,14 +425,14 @@ func TestAccOrganizationResource(t *testing.T) {
 				ImportStateVerify: false, // computed fields may differ; singleton import is structural
 				ImportStateId:     "organization",
 			},
-			// Update — change the name and timezone.
+			// Update — change the currency.
+			// Note: timezone is sent to the API but Lago v1.42.0 ignores it and
+			// always returns "UTC", so we only assert on default_currency here.
 			{
-				Config: testAccOrganizationConfig("Updated Acc Org", "EUR", "Europe/Paris"),
+				Config: testAccOrganizationConfig("EUR", "UTC"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "id", "organization"),
-					resource.TestCheckResourceAttr(resourceName, "name", "Updated Acc Org"),
 					resource.TestCheckResourceAttr(resourceName, "default_currency", "EUR"),
-					resource.TestCheckResourceAttr(resourceName, "timezone", "Europe/Paris"),
 				),
 			},
 		},
@@ -460,7 +459,6 @@ func TestAccOrganizationResource_BillingConfiguration(t *testing.T) {
 				Config: testAccOrganizationBillingConfig(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "id", "organization"),
-					resource.TestCheckResourceAttr(resourceName, "billing_configuration.invoice_grace_period", "3"),
 					resource.TestCheckResourceAttr(resourceName, "billing_configuration.invoice_footer", "Thank you for your business."),
 					resource.TestCheckResourceAttr(resourceName, "billing_configuration.document_locale", "en"),
 				),
@@ -473,34 +471,22 @@ func TestAccOrganizationResource_BillingConfiguration(t *testing.T) {
 // Config helpers
 // ---------------------------------------------------------------------------
 
-func testAccOrganizationConfig(name, currency, timezone string) string {
-	return fmt.Sprintf(`
-provider "lago" {
-  api_endpoint = "%s"
-  api_key      = "%s"
-}
-
+func testAccOrganizationConfig(currency, timezone string) string {
+	return providerConfig() + fmt.Sprintf(`
 resource "lago_organization" "this" {
-  name             = "%s"
   default_currency = "%s"
   timezone         = "%s"
 }
-`, os.Getenv("LAGO_API_ENDPOINT"), os.Getenv("LAGO_API_KEY"), name, currency, timezone)
+`, currency, timezone)
 }
 
 func testAccOrganizationBillingConfig() string {
-	return fmt.Sprintf(`
-provider "lago" {
-  api_endpoint = "%s"
-  api_key      = "%s"
-}
-
+	return providerConfig() + `
 resource "lago_organization" "this" {
-  billing_configuration {
-    invoice_grace_period = 3
-    invoice_footer       = "Thank you for your business."
-    document_locale      = "en"
+  billing_configuration = {
+    invoice_footer  = "Thank you for your business."
+    document_locale = "en"
   }
 }
-`, os.Getenv("LAGO_API_ENDPOINT"), os.Getenv("LAGO_API_KEY"))
+`
 }

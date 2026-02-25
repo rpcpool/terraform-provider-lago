@@ -519,7 +519,7 @@ func mapWalletToModel(ctx context.Context, wallet *lago.Wallet, base walletResou
 	// Preserve whatever was in the base (plan on create/update, prior state on read).
 	// state.PaidCredits and state.GrantedCredits are already carried from base.
 
-	rulesList, ruleDiags := flattenRecurringTransactionRules(ctx, wallet.RecurringTransactionRules)
+	rulesList, ruleDiags := flattenRecurringTransactionRules(ctx, wallet.RecurringTransactionRules, base.RecurringTransactionRules)
 	diags.Append(ruleDiags...)
 	if diags.HasError() {
 		return state, diags
@@ -529,12 +529,16 @@ func mapWalletToModel(ctx context.Context, wallet *lago.Wallet, base walletResou
 	return state, diags
 }
 
-func flattenRecurringTransactionRules(ctx context.Context, rules []lago.RecurringTransactionRuleResponse) (types.List, diag.Diagnostics) {
+func flattenRecurringTransactionRules(ctx context.Context, rules []lago.RecurringTransactionRuleResponse, base types.List) (types.List, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	objType := types.ObjectType{AttrTypes: walletRecurringTransactionRuleObjectType()}
 
 	if len(rules) == 0 {
+		// If the config had no rules (null), keep null so Terraform doesn't see null→[] drift.
+		if base.IsNull() {
+			return types.ListNull(objType), diags
+		}
 		return types.ListValueMust(objType, []attr.Value{}), diags
 	}
 
