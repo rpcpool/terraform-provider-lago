@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.2](https://github.com/rpcpool/terraform-provider-lago/compare/v2.4.1...v2.4.2) (2026-02-25)
+
+
+### Bug Fixes
+
+* resolve state drift, null handling, and upstream SDK workarounds across resources ([8de5997](https://github.com/rpcpool/terraform-provider-lago/commit/8de599728be4ee51e88a4c980dafdb93edc3e674))
+* resolve state drift, null handling, and upstream SDK workarounds across resources ([ab1863c](https://github.com/rpcpool/terraform-provider-lago/commit/ab1863c7a190d8441e002638e33820165d0ae0b7))
+
 ## [2.4.1](https://github.com/rpcpool/terraform-provider-lago/compare/v2.4.0...v2.4.1) (2026-02-25)
 
 
