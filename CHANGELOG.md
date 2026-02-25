@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.1](https://github.com/rpcpool/terraform-provider-lago/compare/v2.4.0...v2.4.1) (2026-02-25)
+
+
+### Bug Fixes
+
+* aggregation type is not editable, force recreate on change ([c054b22](https://github.com/rpcpool/terraform-provider-lago/commit/c054b229a3b781d10f76938242cffd2bc175ef06))
+
 ## [2.4.0](https://github.com/rpcpool/terraform-provider-lago/compare/v2.3.0...v2.4.0) (2026-02-23)
 
 
