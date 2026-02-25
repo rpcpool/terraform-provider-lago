@@ -96,6 +96,8 @@ func (r *billableMetricResource) Schema(_ context.Context, _ resource.SchemaRequ
 				Validators: []validator.String{
 					stringvalidator.OneOf(allowedAggregationTypes...),
 				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
 			},
 			"field_name": schema.StringAttribute{
 				Optional:            true,
