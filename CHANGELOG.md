@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.3](https://github.com/rpcpool/terraform-provider-lago/compare/v2.4.2...v2.4.3) (2026-03-01)
+
+
+### Bug Fixes
+
+* remove old tofu versions from testing ([b7adeb3](https://github.com/rpcpool/terraform-provider-lago/commit/b7adeb37654457b43f7e13a024183ce714cae872))
+
 ## [2.4.2](https://github.com/rpcpool/terraform-provider-lago/compare/v2.4.1...v2.4.2) (2026-02-25)
 
 
