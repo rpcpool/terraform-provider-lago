@@ -3,7 +3,7 @@ module github.com/rpcpool/terraform-provider-lago
 go 1.25.0
 
 require (
-	github.com/getlago/lago-go-client v1.40.1
+	github.com/getlago/lago-go-client v1.45.1
 	github.com/go-resty/resty/v2 v2.17.2
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/terraform-plugin-framework v1.17.0
